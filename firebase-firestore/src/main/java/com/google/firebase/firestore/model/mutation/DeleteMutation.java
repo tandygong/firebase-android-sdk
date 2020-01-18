@@ -22,7 +22,7 @@ import com.google.firebase.firestore.model.DocumentKey;
 import com.google.firebase.firestore.model.MaybeDocument;
 import com.google.firebase.firestore.model.NoDocument;
 import com.google.firebase.firestore.model.SnapshotVersion;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.FieldValue;
 
 /** Represents a Delete operation */
 public final class DeleteMutation extends Mutation {
@@ -86,7 +86,7 @@ public final class DeleteMutation extends Mutation {
 
   @Nullable
   @Override
-  public ObjectValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
+  public FieldValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
     return null;
   }
 }

@@ -23,15 +23,15 @@ import com.google.firebase.firestore.model.DocumentKey;
 import com.google.firebase.firestore.model.DocumentSet;
 import com.google.firebase.firestore.model.ResourcePath;
 import com.google.firebase.firestore.model.SnapshotVersion;
-import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import java.util.Comparator;
 import java.util.Map;
 
 /** A set of utilities for tests */
 public class TestUtil {
 
-  public static FieldValue wrap(Object value) {
+  public static ProtobufValue wrap(Object value) {
     DatabaseId databaseId = DatabaseId.forProject("project");
     UserDataConverter dataConverter = new UserDataConverter(databaseId);
     // HACK: We use parseQueryValue() since it accepts scalars as well as arrays / objects, and

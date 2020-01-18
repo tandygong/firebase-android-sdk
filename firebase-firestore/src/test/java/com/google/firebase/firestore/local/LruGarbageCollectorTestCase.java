@@ -19,7 +19,6 @@ import static com.google.firebase.firestore.testutil.TestUtil.keySet;
 import static com.google.firebase.firestore.testutil.TestUtil.query;
 import static com.google.firebase.firestore.testutil.TestUtil.resumeToken;
 import static com.google.firebase.firestore.testutil.TestUtil.version;
-import static com.google.firebase.firestore.testutil.TestUtil.wrapObject;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -37,7 +36,8 @@ import com.google.firebase.firestore.model.SnapshotVersion;
 import com.google.firebase.firestore.model.mutation.Mutation;
 import com.google.firebase.firestore.model.mutation.Precondition;
 import com.google.firebase.firestore.model.mutation.SetMutation;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
+import com.google.firestore.v1.Value;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -60,7 +60,7 @@ public abstract class LruGarbageCollectorTestCase {
   private int previousTargetId;
   private int previousDocNum;
   private long initialSequenceNumber;
-  private ObjectValue testValue;
+  private ProtobufValue testValue;
 
   abstract Persistence createPersistence(LruGarbageCollector.Params params);
 
@@ -68,11 +68,11 @@ public abstract class LruGarbageCollectorTestCase {
   public void setUp() {
     previousTargetId = 500;
     previousDocNum = 10;
-    Map<String, Object> dataMap = new HashMap<>();
-    dataMap.put("test", "data");
-    dataMap.put("foo", true);
-    dataMap.put("bar", 3);
-    testValue = wrapObject(dataMap);
+    Map<String, Value> dataMap = new HashMap<>();
+    dataMap.put("test", Value.newBuilder().setStringValue("foo").build());
+    dataMap.put("foo", Value.newBuilder().setBooleanValue(true).build());
+    dataMap.put("bar", Value.newBuilder().setIntegerValue(3).build());
+    testValue = new ProtobufValue(dataMap);
 
     newTestResources();
   }

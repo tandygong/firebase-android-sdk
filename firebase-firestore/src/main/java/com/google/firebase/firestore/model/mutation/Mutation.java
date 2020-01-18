@@ -22,7 +22,7 @@ import com.google.firebase.firestore.model.Document;
 import com.google.firebase.firestore.model.DocumentKey;
 import com.google.firebase.firestore.model.MaybeDocument;
 import com.google.firebase.firestore.model.SnapshotVersion;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.FieldValue;
 
 /**
  * Represents a Mutation of a document. Different subclasses of Mutation will perform different
@@ -129,7 +129,7 @@ public abstract class Mutation {
    * @return a base value to store along with the mutation, or null for idempotent mutations.
    */
   @Nullable
-  public abstract ObjectValue extractBaseValue(@Nullable MaybeDocument maybeDoc);
+  public abstract FieldValue extractBaseValue(@Nullable MaybeDocument maybeDoc);
 
   /** Helper for derived classes to implement .equals(). */
   boolean hasSameKeyAndPrecondition(Mutation other) {

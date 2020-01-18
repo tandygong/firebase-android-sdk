@@ -31,11 +31,11 @@ import com.google.firebase.firestore.model.value.ArrayValue;
 import com.google.firebase.firestore.model.value.BlobValue;
 import com.google.firebase.firestore.model.value.BooleanValue;
 import com.google.firebase.firestore.model.value.DoubleValue;
-import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.model.value.GeoPointValue;
 import com.google.firebase.firestore.model.value.IntegerValue;
 import com.google.firebase.firestore.model.value.NullValue;
 import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import com.google.firebase.firestore.model.value.ReferenceValue;
 import com.google.firebase.firestore.model.value.StringValue;
 import com.google.firebase.firestore.model.value.TimestampValue;
@@ -55,7 +55,7 @@ public class UserDataConverterTest {
 
   @Test
   public void testConvertsNullValue() {
-    FieldValue value = wrap(null);
+    ProtobufValue value = wrap(null);
     assertTrue(value instanceof NullValue);
     assertEquals(value.value(), null);
   }
@@ -64,7 +64,7 @@ public class UserDataConverterTest {
   public void testConvertsBooleanValue() {
     List<Boolean> testCases = asList(true, false);
     for (Boolean b : testCases) {
-      FieldValue value = wrap(b);
+      ProtobufValue value = wrap(b);
       assertTrue(value instanceof BooleanValue);
       assertEquals(b, value.value());
     }
@@ -74,7 +74,7 @@ public class UserDataConverterTest {
   public void testConvertsIntegerValue() {
     List<Integer> testCases = asList(Integer.MIN_VALUE, -1, 0, 1, Integer.MAX_VALUE);
     for (Integer i : testCases) {
-      FieldValue value = wrap(i);
+      ProtobufValue value = wrap(i);
       assertTrue(value instanceof IntegerValue);
       assertEquals(i.longValue(), value.value());
     }
@@ -93,7 +93,7 @@ public class UserDataConverterTest {
             Long.valueOf(Integer.MAX_VALUE),
             Long.MAX_VALUE);
     for (Long l : testCases) {
-      FieldValue value = wrap(l);
+      ProtobufValue value = wrap(l);
       assertTrue(value instanceof IntegerValue);
       assertEquals(l, value.value());
     }
@@ -114,7 +114,7 @@ public class UserDataConverterTest {
             Long.MAX_VALUE * 1.0f,
             Float.MAX_VALUE);
     for (Float f : testCases) {
-      FieldValue value = wrap(f);
+      ProtobufValue value = wrap(f);
       assertTrue(value instanceof DoubleValue);
       assertEquals(f.doubleValue(), value.value());
     }
@@ -144,7 +144,7 @@ public class UserDataConverterTest {
             Double.POSITIVE_INFINITY,
             Double.NaN);
     for (Double d : testCases) {
-      FieldValue value = wrap(d);
+      ProtobufValue value = wrap(d);
       assertTrue(value instanceof DoubleValue);
       assertEquals(d, value.value());
     }
@@ -154,7 +154,7 @@ public class UserDataConverterTest {
   public void testConvertsDateValue() {
     List<Date> testCases = asList(new Date(0), new Date(1356048000000L));
     for (Date d : testCases) {
-      FieldValue value = wrap(d);
+      ProtobufValue value = wrap(d);
       assertTrue(value instanceof TimestampValue);
       Timestamp timestamp = (Timestamp) value.value();
       assertEquals(d, timestamp.toDate());
@@ -165,7 +165,7 @@ public class UserDataConverterTest {
   public void testConvertsTimestampValue() {
     List<Timestamp> testCases = asList(new Timestamp(0, 0), new Timestamp(1356048000L, 0));
     for (Timestamp d : testCases) {
-      FieldValue value = wrap(d);
+      ProtobufValue value = wrap(d);
       assertTrue(value instanceof TimestampValue);
       assertTrue(value.value() instanceof Timestamp);
       assertEquals(d, value.value());
@@ -176,7 +176,7 @@ public class UserDataConverterTest {
   public void testConvertsStringValue() {
     List<String> testCases = asList("", "foo");
     for (String s : testCases) {
-      FieldValue value = wrap(s);
+      ProtobufValue value = wrap(s);
       assertTrue(value instanceof StringValue);
       assertEquals(s, value.value());
     }
@@ -186,7 +186,7 @@ public class UserDataConverterTest {
   public void testConvertsBlobValue() {
     List<Blob> testCases = asList(blob(1, 2, 3), blob(1, 2));
     for (Blob b : testCases) {
-      FieldValue value = wrap(b);
+      ProtobufValue value = wrap(b);
       assertTrue(value instanceof BlobValue);
       assertEquals(b, value.value());
     }
@@ -197,7 +197,7 @@ public class UserDataConverterTest {
     DatabaseId id = DatabaseId.forProject("project");
     List<DocumentReference> testCases = asList(ref("foo/bar"), ref("foo/baz"));
     for (DocumentReference docRef : testCases) {
-      FieldValue value = wrap(docRef);
+      ProtobufValue value = wrap(docRef);
       assertTrue(value instanceof ReferenceValue);
       ReferenceValue ref = (ReferenceValue) value;
       assertEquals(TestAccessHelper.referenceKey(docRef), ref.value());
@@ -209,7 +209,7 @@ public class UserDataConverterTest {
   public void testConvertsGeoPointValue() {
     List<GeoPoint> testCases = asList(new GeoPoint(1.24, 4.56), new GeoPoint(-20, 100));
     for (GeoPoint p : testCases) {
-      FieldValue value = wrap(p);
+      ProtobufValue value = wrap(p);
       assertTrue(value instanceof GeoPointValue);
       assertEquals(p, value.value());
     }
@@ -217,7 +217,7 @@ public class UserDataConverterTest {
 
   @Test
   public void testConvertsEmptyObjects() {
-    assertEquals(wrap(new TreeMap<String, FieldValue>()), ObjectValue.emptyObject());
+    assertEquals(wrap(new TreeMap<String, ProtobufValue>()), ObjectValue.emptyObject());
   }
 
   @Test
@@ -226,29 +226,29 @@ public class UserDataConverterTest {
     // the null value and then add the null value later.
     Map<String, Object> actual = map("a", "foo", "b", 1, "c", true, "d", null);
 
-    Map<String, FieldValue> expected =
+    Map<String, ProtobufValue> expected =
         map(
             "a", StringValue.valueOf("foo"),
             "b", IntegerValue.valueOf(1L),
             "c", BooleanValue.valueOf(true),
             "d", NullValue.nullValue());
 
-    FieldValue wrappedActual = wrapObject(actual);
+    ProtobufValue wrappedActual = wrapObject(actual);
     ObjectValue wrappedExpected = ObjectValue.fromMap(expected);
     assertEquals(wrappedActual, wrappedExpected);
   }
 
   private static ObjectValue fromMap(Object... entries) {
-    Map<String, FieldValue> res = new HashMap<>();
+    Map<String, ProtobufValue> res = new HashMap<>();
     for (int i = 0; i < entries.length; i += 2) {
-      res.put((String) entries[i], (FieldValue) entries[i + 1]);
+      res.put((String) entries[i], (ProtobufValue) entries[i + 1]);
     }
     return ObjectValue.fromMap(res);
   }
 
   @Test
   public void testConvertsNestedObjects() {
-    FieldValue actual = wrapObject("a", map("b", map("c", "foo"), "d", true));
+    ProtobufValue actual = wrapObject("a", map("b", map("c", "foo"), "d", true));
     ObjectValue expected =
         fromMap(
             "a",
@@ -261,7 +261,7 @@ public class UserDataConverterTest {
   public void testConvertsLists() {
     ArrayValue expected =
         ArrayValue.fromList(asList(StringValue.valueOf("value"), BooleanValue.valueOf(true)));
-    FieldValue actual = wrap(asList("value", true));
+    ProtobufValue actual = wrap(asList("value", true));
     assertEquals(expected, actual);
   }
 

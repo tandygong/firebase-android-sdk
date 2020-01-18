@@ -25,7 +25,8 @@ import com.google.firebase.firestore.model.MaybeDocument;
 import com.google.firebase.firestore.model.SnapshotVersion;
 import com.google.firebase.firestore.model.UnknownDocument;
 import com.google.firebase.firestore.model.value.FieldValue;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
+import com.google.firestore.v1.ValueOrBuilder;
 
 /**
  * A mutation that modifies fields of the document at the given key with the given values. The
@@ -40,11 +41,11 @@ import com.google.firebase.firestore.model.value.ObjectValue;
  */
 public final class PatchMutation extends Mutation {
 
-  private final ObjectValue value;
+  private final FieldValue value;
   private final FieldMask mask;
 
   public PatchMutation(
-      DocumentKey key, ObjectValue value, FieldMask mask, Precondition precondition) {
+      DocumentKey key, FieldValue value, FieldMask mask, Precondition precondition) {
     super(key, precondition);
     this.value = value;
     this.mask = mask;
@@ -82,7 +83,7 @@ public final class PatchMutation extends Mutation {
   }
 
   /** Returns the fields and associated values to use when patching the document. */
-  public ObjectValue getValue() {
+  public FieldValue getValue() {
     return value;
   }
 
@@ -111,7 +112,7 @@ public final class PatchMutation extends Mutation {
     }
 
     SnapshotVersion version = mutationResult.getVersion();
-    ObjectValue newData = patchDocument(maybeDoc);
+    FieldValue newData = patchDocument(maybeDoc);
     return new Document(getKey(), version, Document.DocumentState.COMMITTED_MUTATIONS, newData);
   }
 
@@ -126,13 +127,13 @@ public final class PatchMutation extends Mutation {
     }
 
     SnapshotVersion version = getPostMutationVersion(maybeDoc);
-    ObjectValue newData = patchDocument(maybeDoc);
+    FieldValue newData = patchDocument(maybeDoc);
     return new Document(getKey(), version, Document.DocumentState.LOCAL_MUTATIONS, newData);
   }
 
   @Nullable
   @Override
-  public ObjectValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
+  public FieldValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
     return null;
   }
 
@@ -140,20 +141,20 @@ public final class PatchMutation extends Mutation {
    * Patches the data of document if available or creates a new document. Note that this does not
    * check whether or not the precondition of this patch holds.
    */
-  private ObjectValue patchDocument(@Nullable MaybeDocument maybeDoc) {
-    ObjectValue data;
+  private FieldValue patchDocument(@Nullable MaybeDocument maybeDoc) {
+    FieldValue data;
     if (maybeDoc instanceof Document) {
       data = ((Document) maybeDoc).getData();
     } else {
-      data = ObjectValue.emptyObject();
+      data = ProtobufValue.emptyObject();
     }
     return patchObject(data);
   }
 
-  private ObjectValue patchObject(ObjectValue obj) {
+  private FieldValue patchObject(FieldValue obj) {
     for (FieldPath path : mask.getMask()) {
       if (!path.isEmpty()) {
-        FieldValue newValue = value.get(path);
+        ValueOrBuilder newValue = value.get(path);
         if (newValue == null) {
           obj = obj.delete(path);
         } else {

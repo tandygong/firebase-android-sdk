@@ -24,7 +24,9 @@ import com.google.firebase.firestore.model.FieldPath;
 import com.google.firebase.firestore.model.MaybeDocument;
 import com.google.firebase.firestore.model.UnknownDocument;
 import com.google.firebase.firestore.model.value.FieldValue;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
+import com.google.firestore.v1.Value;
+import com.google.firestore.v1.ValueOrBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,9 +99,9 @@ public final class TransformMutation extends Mutation {
     }
 
     Document doc = requireDocument(maybeDoc);
-    List<FieldValue> transformResults =
+    List<ValueOrBuilder> transformResults =
         serverTransformResults(doc, mutationResult.getTransformResults());
-    ObjectValue newData = transformObject(doc.getData(), transformResults);
+    FieldValue newData = transformObject(doc.getData(), transformResults);
     return new Document(
         getKey(), mutationResult.getVersion(), Document.DocumentState.COMMITTED_MUTATIONS, newData);
   }
@@ -115,27 +117,28 @@ public final class TransformMutation extends Mutation {
     }
 
     Document doc = requireDocument(maybeDoc);
-    List<FieldValue> transformResults = localTransformResults(localWriteTime, maybeDoc, baseDoc);
-    ObjectValue newData = transformObject(doc.getData(), transformResults);
+    List<ValueOrBuilder> transformResults =
+        localTransformResults(localWriteTime, maybeDoc, baseDoc);
+    FieldValue newData = transformObject(doc.getData(), transformResults);
     return new Document(
         getKey(), doc.getVersion(), Document.DocumentState.LOCAL_MUTATIONS, newData);
   }
 
   @Nullable
   @Override
-  public ObjectValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
-    ObjectValue baseObject = null;
+  public FieldValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
+    FieldValue baseObject = null;
 
     for (FieldTransform transform : fieldTransforms) {
-      FieldValue existingValue = null;
+      ValueOrBuilder existingValue = null;
       if (maybeDoc instanceof Document) {
         existingValue = ((Document) maybeDoc).getField(transform.getFieldPath());
       }
 
-      FieldValue coercedValue = transform.getOperation().computeBaseValue(existingValue);
+      ValueOrBuilder coercedValue = transform.getOperation().computeBaseValue(existingValue);
       if (coercedValue != null) {
         if (baseObject == null) {
-          baseObject = ObjectValue.emptyObject().set(transform.getFieldPath(), coercedValue);
+          baseObject = ProtobufValue.emptyObject().set(transform.getFieldPath(), coercedValue);
         } else {
           baseObject = baseObject.set(transform.getFieldPath(), coercedValue);
         }
@@ -166,9 +169,9 @@ public final class TransformMutation extends Mutation {
    * @param serverTransformResults The transform results received by the server.
    * @return The transform results list.
    */
-  private List<FieldValue> serverTransformResults(
-      @Nullable MaybeDocument baseDoc, List<FieldValue> serverTransformResults) {
-    ArrayList<FieldValue> transformResults = new ArrayList<>(fieldTransforms.size());
+  private List<ValueOrBuilder> serverTransformResults(
+      @Nullable MaybeDocument baseDoc, List<Value> serverTransformResults) {
+    ArrayList<ValueOrBuilder> transformResults = new ArrayList<>(fieldTransforms.size());
     hardAssert(
         fieldTransforms.size() == serverTransformResults.size(),
         "server transform count (%d) should match field transform count (%d)",
@@ -179,7 +182,7 @@ public final class TransformMutation extends Mutation {
       FieldTransform fieldTransform = fieldTransforms.get(i);
       TransformOperation transform = fieldTransform.getOperation();
 
-      FieldValue previousValue = null;
+      ValueOrBuilder previousValue = null;
       if (baseDoc instanceof Document) {
         previousValue = ((Document) baseDoc).getField(fieldTransform.getFieldPath());
       }
@@ -200,19 +203,19 @@ public final class TransformMutation extends Mutation {
    * @param baseDoc The document prior to applying this mutation batch.
    * @return The transform results list.
    */
-  private List<FieldValue> localTransformResults(
+  private List<ValueOrBuilder> localTransformResults(
       Timestamp localWriteTime, @Nullable MaybeDocument maybeDoc, @Nullable MaybeDocument baseDoc) {
-    ArrayList<FieldValue> transformResults = new ArrayList<>(fieldTransforms.size());
+    ArrayList<ValueOrBuilder> transformResults = new ArrayList<>(fieldTransforms.size());
     for (FieldTransform fieldTransform : fieldTransforms) {
       TransformOperation transform = fieldTransform.getOperation();
 
-      FieldValue previousValue = null;
+      ValueOrBuilder previousValue = null;
       if (maybeDoc instanceof Document) {
         previousValue = ((Document) maybeDoc).getField(fieldTransform.getFieldPath());
       }
 
       if (previousValue == null && baseDoc instanceof Document) {
-        // If the current document does not contain a value for the mutated field, use the value
+        // If the current document does not contain a value for the mutated field, use thevalue
         // that existed before applying this mutation batch. This solves an edge case where a
         // PatchMutation clears the values in a nested map before the TransformMutation is applied.
         previousValue = ((Document) baseDoc).getField(fieldTransform.getFieldPath());
@@ -223,7 +226,8 @@ public final class TransformMutation extends Mutation {
     return transformResults;
   }
 
-  private ObjectValue transformObject(ObjectValue objectValue, List<FieldValue> transformResults) {
+  private FieldValue transformObject(
+      FieldValue objectValue, List<ValueOrBuilder> transformResults) {
     hardAssert(
         transformResults.size() == fieldTransforms.size(), "Transform results length mismatch.");
 

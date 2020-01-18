@@ -14,17 +14,11 @@
 
 package com.google.firebase.firestore.model;
 
-import static com.google.firebase.firestore.util.Assert.hardAssert;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.google.common.base.Function;
 import com.google.firebase.firestore.model.value.FieldValue;
-import com.google.firebase.firestore.model.value.ObjectValue;
-import com.google.firestore.v1.Value;
+import com.google.firestore.v1.ValueOrBuilder;
 import java.util.Comparator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Represents a document in Firestore with a key, version, data and whether the data has local
@@ -52,34 +46,17 @@ public final class Document extends MaybeDocument {
 
   private final DocumentState documentState;
   private @Nullable final com.google.firestore.v1.Document proto;
-  private @Nullable final Function<Value, FieldValue> converter;
-  private @Nullable ObjectValue objectValue;
-
-  /** A cache for FieldValues that have already been deserialized in `getField()`. */
-  private @Nullable Map<FieldPath, FieldValue> fieldValueCache;
+  private FieldValue objectValue;
 
   public Document(
       DocumentKey key,
       SnapshotVersion version,
       DocumentState documentState,
-      ObjectValue objectValue) {
+      FieldValue objectValue) {
     super(key, version);
     this.documentState = documentState;
     this.objectValue = objectValue;
     this.proto = null;
-    this.converter = null;
-  }
-
-  public Document(
-      DocumentKey key,
-      SnapshotVersion version,
-      DocumentState documentState,
-      com.google.firestore.v1.Document proto,
-      Function<com.google.firestore.v1.Value, FieldValue> converter) {
-    super(key, version);
-    this.documentState = documentState;
-    this.proto = proto;
-    this.converter = converter;
   }
 
   /**
@@ -91,66 +68,12 @@ public final class Document extends MaybeDocument {
   }
 
   @NonNull
-  public ObjectValue getData() {
-    if (objectValue == null) {
-      hardAssert(proto != null && converter != null, "Expected proto and converter to be non-null");
-
-      ObjectValue result = ObjectValue.emptyObject();
-      for (Map.Entry<String, com.google.firestore.v1.Value> entry :
-          proto.getFieldsMap().entrySet()) {
-        FieldPath path = FieldPath.fromSingleSegment(entry.getKey());
-        FieldValue value = converter.apply(entry.getValue());
-        result = result.set(path, value);
-      }
-      objectValue = result;
-
-      // Once objectValue is computed, values inside the fieldValueCache are no longer accessed.
-      fieldValueCache = null;
-    }
-
+  public FieldValue getData() {
     return objectValue;
   }
 
-  public @Nullable FieldValue getField(FieldPath path) {
-    if (objectValue != null) {
-      return objectValue.get(path);
-    } else {
-      hardAssert(proto != null && converter != null, "Expected proto and converter to be non-null");
-
-      Map<FieldPath, FieldValue> fieldValueCache = this.fieldValueCache;
-      if (fieldValueCache == null) {
-        // TODO(b/136090445): Remove the cache when `getField` is no longer called during Query
-        // ordering.
-        fieldValueCache = new ConcurrentHashMap<>();
-        this.fieldValueCache = fieldValueCache;
-      }
-
-      FieldValue fieldValue = fieldValueCache.get(path);
-      if (fieldValue == null) {
-        // Instead of deserializing the full Document proto, we only deserialize the value at
-        // the requested field path. This speeds up Query execution as query filters can discard
-        // documents based on a single field.
-        Value protoValue = proto.getFieldsMap().get(path.getFirstSegment());
-        for (int i = 1; protoValue != null && i < path.length(); ++i) {
-          if (protoValue.getValueTypeCase() != Value.ValueTypeCase.MAP_VALUE) {
-            return null;
-          }
-          protoValue = protoValue.getMapValue().getFieldsMap().get(path.getSegment(i));
-        }
-
-        if (protoValue != null) {
-          fieldValue = converter.apply(protoValue);
-          fieldValueCache.put(path, fieldValue);
-        }
-      }
-
-      return fieldValue;
-    }
-  }
-
-  public @Nullable Object getFieldValue(FieldPath path) {
-    FieldValue value = getField(path);
-    return (value == null) ? null : value.value();
+  public @Nullable ValueOrBuilder getField(FieldPath path) {
+    return objectValue.get(path);
   }
 
   public boolean hasLocalMutations() {

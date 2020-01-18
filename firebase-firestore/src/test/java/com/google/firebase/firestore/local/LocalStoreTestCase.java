@@ -973,7 +973,7 @@ public abstract class LocalStoreTestCase {
     assertSetEquals(asList(key("foo/bar"), key("foo/baz")), keys);
   }
 
-  // TODO(mrschmidt): The FieldValue.increment() field transform tests below would probably be
+  // TODO(mrschmidt): The ProtobufValue.increment() field transform tests below would probably be
   // better implemented as spec tests but currently they don't support transforms.
 
   @Test

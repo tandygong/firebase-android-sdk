@@ -35,11 +35,11 @@ import com.google.firebase.firestore.model.mutation.FieldMask;
 import com.google.firebase.firestore.model.value.BlobValue;
 import com.google.firebase.firestore.model.value.BooleanValue;
 import com.google.firebase.firestore.model.value.DoubleValue;
-import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.model.value.GeoPointValue;
 import com.google.firebase.firestore.model.value.IntegerValue;
 import com.google.firebase.firestore.model.value.NullValue;
 import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import com.google.firebase.firestore.model.value.ReferenceValue;
 import com.google.firebase.firestore.model.value.ServerTimestampValue;
 import com.google.firebase.firestore.model.value.StringValue;
@@ -74,7 +74,7 @@ public class FieldValueTest {
 
   @Test
   public void testExtractsFields() {
-    FieldValue val = wrapObject("foo", map("a", 1, "b", true, "c", "string"));
+    ProtobufValue val = wrapObject("foo", map("a", 1, "b", true, "c", "string"));
     assertTrue(val instanceof ObjectValue);
     ObjectValue obj = (ObjectValue) val;
     assertTrue(obj.get(field("foo")) instanceof ObjectValue);
@@ -89,7 +89,7 @@ public class FieldValueTest {
 
   @Test
   public void testExtractsFieldMask() {
-    FieldValue val =
+    ProtobufValue val =
         wrapObject(
             "a",
             "b",
@@ -115,7 +115,7 @@ public class FieldValueTest {
   public void testAddsNewFields() {
     ObjectValue empty = ObjectValue.emptyObject();
     ObjectValue mod = empty.set(field("a"), wrap("mod"));
-    assertEquals(wrap(new TreeMap<String, FieldValue>()), empty);
+    assertEquals(wrap(new TreeMap<String, ProtobufValue>()), empty);
     assertEquals(wrapObject("a", "mod"), mod);
 
     ObjectValue old = mod;

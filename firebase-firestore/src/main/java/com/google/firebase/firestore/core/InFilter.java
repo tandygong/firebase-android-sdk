@@ -16,19 +16,17 @@ package com.google.firebase.firestore.core;
 
 import com.google.firebase.firestore.model.Document;
 import com.google.firebase.firestore.model.FieldPath;
-import com.google.firebase.firestore.model.value.ArrayValue;
-import com.google.firebase.firestore.model.value.FieldValue;
+import com.google.firestore.v1.Value;
 
 /** A Filter that implements the IN operator. */
 public class InFilter extends FieldFilter {
-  InFilter(FieldPath field, ArrayValue value) {
+  InFilter(FieldPath field, Value value) {
     super(field, Operator.IN, value);
   }
 
   @Override
   public boolean matches(Document doc) {
-    ArrayValue arrayValue = (ArrayValue) getValue();
-    FieldValue other = doc.getField(getField());
-    return other != null && arrayValue.getInternalValue().contains(other);
+    Value other = doc.getField(getField());
+    return other != null && getValue().getArrayValue().getValuesList().contains(other);
   }
 }

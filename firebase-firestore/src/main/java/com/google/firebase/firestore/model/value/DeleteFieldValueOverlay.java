@@ -1,4 +1,4 @@
-// Copyright 2018 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,44 +15,27 @@
 package com.google.firebase.firestore.model.value;
 
 import androidx.annotation.Nullable;
+import com.google.firebase.firestore.model.FieldPath;
+import com.google.firebase.firestore.model.mutation.FieldMask;
+import com.google.firestore.v1.ValueOrBuilder;
 
-/** A wrapper for null values in Firestore. */
-public class NullValue extends FieldValue {
-  private static final NullValue INSTANCE = new NullValue();
+public class DeleteFieldValueOverlay extends FieldValue {
+  private FieldValue baseValue;
+  private FieldPath path;
 
-  private NullValue() {}
-
-  @Override
-  public int typeOrder() {
-    return TYPE_ORDER_NULL;
+  public DeleteFieldValueOverlay(FieldValue baseValue, FieldPath path) {
+    this.baseValue = baseValue;
+    this.path = path;
   }
 
-  @Override
   @Nullable
-  public Object value() {
-    return null;
+  @Override
+  public ValueOrBuilder get(FieldPath fieldPath) {
+    return path.isPrefixOf(fieldPath) ? null : baseValue.get(fieldPath);
   }
 
   @Override
-  public boolean equals(Object o) {
-    return o instanceof NullValue;
-  }
-
-  @Override
-  public int hashCode() {
-    return -1;
-  }
-
-  @Override
-  public int compareTo(FieldValue other) {
-    if (other instanceof NullValue) {
-      return 0;
-    } else {
-      return defaultCompareTo(other);
-    }
-  }
-
-  public static NullValue nullValue() {
-    return INSTANCE;
+  public FieldMask getFieldMask() {
+    return baseValue.getFieldMask(); // remove
   }
 }

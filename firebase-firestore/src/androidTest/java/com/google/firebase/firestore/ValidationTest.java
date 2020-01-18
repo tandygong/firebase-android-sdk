@@ -271,7 +271,7 @@ public class ValidationTest {
   public void setsMustNotContainFieldValueDelete() {
     expectSetError(
         map("foo", FieldValue.delete()),
-        "Invalid data. FieldValue.delete() can only be used with update() and set() with "
+        "Invalid data. ProtobufValue.delete() can only be used with update() and set() with "
             + "SetOptions.merge() (found in field foo)");
   }
 
@@ -279,7 +279,7 @@ public class ValidationTest {
   public void updatesMustNotContainNestedFieldValueDeletes() {
     expectUpdateError(
         map("foo", map("bar", FieldValue.delete())),
-        "Invalid data. FieldValue.delete() can only appear at the top level of your update data "
+        "Invalid data. ProtobufValue.delete() can only appear at the top level of your update data "
             + "(found in field foo.bar)");
   }
 
@@ -362,13 +362,13 @@ public class ValidationTest {
   public void arrayTransformsFailInQueries() {
     CollectionReference collection = testCollection();
     String reason =
-        "Invalid data. FieldValue.arrayUnion() can only be used with set() and update() "
+        "Invalid data. ProtobufValue.arrayUnion() can only be used with set() and update() "
             + "(found in field test)";
     expectError(
         () -> collection.whereEqualTo("test", map("test", FieldValue.arrayUnion(1))), reason);
 
     reason =
-        "Invalid data. FieldValue.arrayRemove() can only be used with set() and update() "
+        "Invalid data. ProtobufValue.arrayRemove() can only be used with set() and update() "
             + "(found in field test)";
     expectError(
         () -> collection.whereEqualTo("test", map("test", FieldValue.arrayRemove(1))), reason);

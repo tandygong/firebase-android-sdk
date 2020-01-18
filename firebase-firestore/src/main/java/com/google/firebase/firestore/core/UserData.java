@@ -27,7 +27,7 @@ import com.google.firebase.firestore.model.mutation.Precondition;
 import com.google.firebase.firestore.model.mutation.SetMutation;
 import com.google.firebase.firestore.model.mutation.TransformMutation;
 import com.google.firebase.firestore.model.mutation.TransformOperation;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.util.Assert;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -137,7 +137,7 @@ public class UserData {
      *
      * @return ParsedSetData that wraps the contents of this ParseAccumulator.
      */
-    public ParsedSetData toMergeData(ObjectValue data) {
+    public ParsedSetData toMergeData(FieldValue data) {
       return new ParsedSetData(
           data, FieldMask.fromSet(fieldMask), unmodifiableList(fieldTransforms));
     }
@@ -154,7 +154,7 @@ public class UserData {
      *     result will be the userFieldMask and only transforms that are covered by the mask will be
      *     included.
      */
-    public ParsedSetData toMergeData(ObjectValue data, FieldMask userFieldMask) {
+    public ParsedSetData toMergeData(FieldValue data, FieldMask userFieldMask) {
 
       ArrayList<FieldTransform> coveredFieldTransforms = new ArrayList<>();
 
@@ -173,7 +173,7 @@ public class UserData {
      *
      * @return ParsedSetData that wraps the contents of this ParseAccumulator.
      */
-    public ParsedSetData toSetData(ObjectValue data) {
+    public ParsedSetData toSetData(FieldValue data) {
       return new ParsedSetData(data, /* fieldMask= */ null, unmodifiableList(fieldTransforms));
     }
 
@@ -183,7 +183,7 @@ public class UserData {
      *
      * @return ParsedSetData that wraps the contents of this ParseAccumulator.
      */
-    public ParsedUpdateData toUpdateData(ObjectValue data) {
+    public ParsedUpdateData toUpdateData(FieldValue data) {
       return new ParsedUpdateData(
           data, FieldMask.fromSet(fieldMask), unmodifiableList(fieldTransforms));
     }
@@ -324,12 +324,12 @@ public class UserData {
 
   /** The result of parsing document data (e.g. for a setData call). */
   public static class ParsedSetData {
-    private final ObjectValue data;
+    private final FieldValue data;
     @Nullable private final FieldMask fieldMask;
     private final List<FieldTransform> fieldTransforms;
 
     ParsedSetData(
-        ObjectValue data, @Nullable FieldMask fieldMask, List<FieldTransform> fieldTransforms) {
+        FieldValue data, @Nullable FieldMask fieldMask, List<FieldTransform> fieldTransforms) {
       this.data = data;
       this.fieldMask = fieldMask;
       this.fieldTransforms = fieldTransforms;
@@ -351,11 +351,11 @@ public class UserData {
 
   /** The result of parsing "update" data (i.e. for an updateData call). */
   public static class ParsedUpdateData {
-    private final ObjectValue data;
+    private final FieldValue data;
     private final FieldMask fieldMask;
     private final List<FieldTransform> fieldTransforms;
 
-    ParsedUpdateData(ObjectValue data, FieldMask fieldMask, List<FieldTransform> fieldTransforms) {
+    ParsedUpdateData(FieldValue data, FieldMask fieldMask, List<FieldTransform> fieldTransforms) {
       this.data = data;
       this.fieldMask = fieldMask;
       this.fieldTransforms = fieldTransforms;

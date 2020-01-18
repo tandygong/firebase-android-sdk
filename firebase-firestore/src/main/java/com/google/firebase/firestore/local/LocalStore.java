@@ -37,7 +37,7 @@ import com.google.firebase.firestore.model.mutation.MutationBatch;
 import com.google.firebase.firestore.model.mutation.MutationBatchResult;
 import com.google.firebase.firestore.model.mutation.PatchMutation;
 import com.google.firebase.firestore.model.mutation.Precondition;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.remote.RemoteEvent;
 import com.google.firebase.firestore.remote.TargetChange;
 import com.google.firebase.firestore.util.Logger;
@@ -218,7 +218,7 @@ public final class LocalStore {
           // transform.
           List<Mutation> baseMutations = new ArrayList<>();
           for (Mutation mutation : mutations) {
-            ObjectValue baseValue =
+            FieldValue baseValue =
                 mutation.extractBaseValue(existingDocuments.get(mutation.getKey()));
             if (baseValue != null) {
               // NOTE: The base state should only be applied if there's some existing

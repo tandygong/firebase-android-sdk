@@ -63,8 +63,8 @@ import com.google.firebase.firestore.model.mutation.Precondition;
 import com.google.firebase.firestore.model.mutation.SetMutation;
 import com.google.firebase.firestore.model.mutation.TransformMutation;
 import com.google.firebase.firestore.model.mutation.VerifyMutation;
-import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import com.google.firebase.firestore.remote.RemoteEvent;
 import com.google.firebase.firestore.remote.TargetChange;
 import com.google.firebase.firestore.remote.WatchChange;
@@ -126,7 +126,7 @@ public class TestUtil {
 
   public static final Map<String, Object> EMPTY_MAP = new HashMap<>();
 
-  public static FieldValue wrap(Object value) {
+  public static ProtobufValue wrap(Object value) {
     DatabaseId databaseId = DatabaseId.forProject("project");
     UserDataConverter dataConverter = new UserDataConverter(databaseId);
     // HACK: We use parseQueryValue() since it accepts scalars as well as arrays / objects, and
@@ -484,7 +484,7 @@ public class TestUtil {
       FieldPath fieldPath = field(entry.getKey());
       objectMask.add(fieldPath);
       if (!entry.getValue().equals(DELETE_SENTINEL)) {
-        FieldValue parsedValue = wrap(entry.getValue());
+        ProtobufValue parsedValue = wrap(entry.getValue());
         objectValue = objectValue.set(fieldPath, parsedValue);
       }
     }
@@ -512,9 +512,9 @@ public class TestUtil {
   }
 
   /**
-   * Creates a TransformMutation by parsing any FieldValue sentinels in the provided data. The data
-   * is expected to use dotted-notation for nested fields (i.e. { "foo.bar": FieldValue.foo() } and
-   * must not contain any non-sentinel data.
+   * Creates a TransformMutation by parsing any ProtobufValue sentinels in the provided data. The
+   * data is expected to use dotted-notation for nested fields (i.e. { "foo.bar":
+   * ProtobufValue.foo() } and must not contain any non-sentinel data.
    */
   public static TransformMutation transformMutation(String path, Map<String, Object> data) {
     UserDataConverter dataConverter = new UserDataConverter(DatabaseId.forProject("project"));

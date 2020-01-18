@@ -15,6 +15,7 @@
 package com.google.firebase.firestore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.firebase.firestore.remote.RemoteSerializer.extractLocalPathFromResourceName;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,14 +23,13 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.model.DatabaseId;
 import com.google.firebase.firestore.model.Document;
 import com.google.firebase.firestore.model.DocumentKey;
-import com.google.firebase.firestore.model.value.ArrayValue;
-import com.google.firebase.firestore.model.value.FieldValue;
-import com.google.firebase.firestore.model.value.ObjectValue;
-import com.google.firebase.firestore.model.value.ReferenceValue;
-import com.google.firebase.firestore.model.value.ServerTimestampValue;
-import com.google.firebase.firestore.model.value.TimestampValue;
+import com.google.firebase.firestore.model.ResourcePath;
+import com.google.firebase.firestore.remote.RemoteSerializer;
 import com.google.firebase.firestore.util.CustomClassMapper;
 import com.google.firebase.firestore.util.Logger;
+import com.google.firestore.v1.ArrayValue;
+import com.google.firestore.v1.MapValue;
+import com.google.firestore.v1.Value;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -169,7 +169,9 @@ public class DocumentSnapshot {
     return doc == null
         ? null
         : convertObject(
-            doc.getData(),
+            doc.getData()
+                .get(com.google.firebase.firestore.model.FieldPath.EMPTY_PATH)
+                .getMapValue(),
             new FieldValueOptions(
                 serverTimestampBehavior,
                 firestore.getFirestoreSettings().areTimestampsInSnapshotsEnabled()));
@@ -547,35 +549,60 @@ public class DocumentSnapshot {
   }
 
   @Nullable
-  private Object convertValue(FieldValue value, FieldValueOptions options) {
-    if (value instanceof ObjectValue) {
-      return convertObject((ObjectValue) value, options);
-    } else if (value instanceof ArrayValue) {
-      return convertArray((ArrayValue) value, options);
-    } else if (value instanceof ReferenceValue) {
-      return convertReference((ReferenceValue) value);
-    } else if (value instanceof TimestampValue) {
-      return convertTimestamp((TimestampValue) value, options);
-    } else if (value instanceof ServerTimestampValue) {
-      return convertServerTimestamp((ServerTimestampValue) value, options);
-    } else {
-      return value.value();
+  private Object convertValue(Value value, FieldValueOptions options) {
+    switch (value.getValueTypeCase()) {
+      case NULL_VALUE:
+        return null;
+      case BOOLEAN_VALUE:
+        return value.getBooleanValue();
+      case INTEGER_VALUE:
+        return value.getIntegerValue();
+      case DOUBLE_VALUE:
+        return value.getDoubleValue();
+      case TIMESTAMP_VALUE:
+        return convertTimestamp(value.getTimestampValue(), options);
+      case STRING_VALUE:
+        return value.getStringValue();
+      case BYTES_VALUE:
+        return Blob.fromByteString(value.getBytesValue());
+      case REFERENCE_VALUE:
+        return convertReference(value.getReferenceValue());
+      case GEO_POINT_VALUE:
+        break;
+      case ARRAY_VALUE:
+        return convertArray(value.getArrayValue(), options);
+      case MAP_VALUE:
+        if (isServerTimestamp(value)) {
+          return convertServerTimestamp(value.getMapValue(), options);
+        }
+        return convertObject(value.getMapValue(), options);
+      case VALUETYPE_NOT_SET:
+        break;
     }
+
+    return null;
   }
 
-  private Object convertServerTimestamp(ServerTimestampValue value, FieldValueOptions options) {
+  private boolean isServerTimestamp(Value value) {
+    // TODO: safety checks
+    return value.getValueTypeCase() == Value.ValueTypeCase.MAP_VALUE
+        && "__server_timestamp__"
+            .equals(value.getMapValue().getFieldsMap().get("__type__").getStringValue());
+  }
+
+  private Object convertServerTimestamp(MapValue value, FieldValueOptions options) {
     switch (options.serverTimestampBehavior) {
       case PREVIOUS:
-        return value.getPreviousValue();
+        return value.getFieldsMap().get("__previous_value__");
       case ESTIMATE:
-        return value.getLocalWriteTime();
+        return value.getFieldsMap().get("__local_write_time__");
       default:
-        return value.value();
+        return null;
     }
   }
 
-  private Object convertTimestamp(TimestampValue value, FieldValueOptions options) {
-    Timestamp timestamp = value.value();
+  private Object convertTimestamp(com.google.protobuf.Timestamp value, FieldValueOptions options) {
+    Timestamp timestamp = new Timestamp(value.getSeconds(), value.getNanos());
     if (options.timestampsInSnapshotsEnabled) {
       return timestamp;
     } else {
@@ -583,9 +610,11 @@ public class DocumentSnapshot {
     }
   }
 
-  private Object convertReference(ReferenceValue value) {
-    DocumentKey key = value.value();
-    DatabaseId refDatabase = value.getDatabaseId();
+  private Object convertReference(String value) {
+    ResourcePath resourceName = RemoteSerializer.decodeResourceName(value);
+    DatabaseId refDatabase =
+        DatabaseId.forDatabase(resourceName.getSegment(1), resourceName.getSegment(3));
+    DocumentKey key = DocumentKey.fromPath(extractLocalPathFromResourceName(resourceName));
     DatabaseId database = this.firestore.getDatabaseId();
     if (!refDatabase.equals(database)) {
       // TODO: Somehow support foreign references.
@@ -603,17 +632,17 @@ public class DocumentSnapshot {
     return new DocumentReference(key, firestore);
   }
 
-  private Map<String, Object> convertObject(ObjectValue objectValue, FieldValueOptions options) {
+  private Map<String, Object> convertObject(MapValue objectValue, FieldValueOptions options) {
     Map<String, Object> result = new HashMap<>();
-    for (Map.Entry<String, FieldValue> entry : objectValue.getInternalValue()) {
+    for (Map.Entry<String, Value> entry : objectValue.getFieldsMap().entrySet()) {
       result.put(entry.getKey(), convertValue(entry.getValue(), options));
     }
     return result;
   }
 
   private List<Object> convertArray(ArrayValue arrayValue, FieldValueOptions options) {
-    ArrayList<Object> result = new ArrayList<>(arrayValue.getInternalValue().size());
-    for (FieldValue v : arrayValue.getInternalValue()) {
+    ArrayList<Object> result = new ArrayList<>(arrayValue.getValuesCount());
+    for (Value v : arrayValue.getValuesList()) {
       result.add(convertValue(v, options));
     }
     return result;
@@ -624,7 +653,7 @@ public class DocumentSnapshot {
       @NonNull com.google.firebase.firestore.model.FieldPath fieldPath,
       @NonNull FieldValueOptions options) {
     if (doc != null) {
-      FieldValue val = doc.getField(fieldPath);
+      Value val = doc.getField(fieldPath);
       if (val != null) {
         return convertValue(val, options);
       }

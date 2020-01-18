@@ -21,6 +21,7 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.core.Target;
 import com.google.firebase.firestore.model.Document;
 import com.google.firebase.firestore.model.DocumentKey;
+import com.google.firebase.firestore.model.FieldPath;
 import com.google.firebase.firestore.model.MaybeDocument;
 import com.google.firebase.firestore.model.NoDocument;
 import com.google.firebase.firestore.model.SnapshotVersion;
@@ -28,12 +29,11 @@ import com.google.firebase.firestore.model.UnknownDocument;
 import com.google.firebase.firestore.model.mutation.Mutation;
 import com.google.firebase.firestore.model.mutation.MutationBatch;
 import com.google.firebase.firestore.model.value.FieldValue;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import com.google.firebase.firestore.remote.RemoteSerializer;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /** Serializer for values stored in the LocalStore. */
 public final class LocalSerializer {
@@ -98,11 +98,9 @@ public final class LocalSerializer {
         com.google.firestore.v1.Document.newBuilder();
     builder.setName(rpcSerializer.encodeKey(document.getKey()));
 
-    ObjectValue value = document.getData();
-    for (Map.Entry<String, FieldValue> entry : value.getInternalValue()) {
-      builder.putFields(entry.getKey(), rpcSerializer.encodeValue(entry.getValue()));
-    }
-
+    FieldValue value = document.getData();
+    // TODO(mrschmidt): Remove redundant copy
+    builder.putAllFields(value.get(FieldPath.EMPTY_PATH).getMapValue().getFieldsMap());
     Timestamp updateTime = document.getVersion().getTimestamp();
     builder.setUpdateTime(rpcSerializer.encodeTimestamp(updateTime));
     return builder.build();
@@ -119,8 +117,7 @@ public final class LocalSerializer {
         hasCommittedMutations
             ? Document.DocumentState.COMMITTED_MUTATIONS
             : Document.DocumentState.SYNCED,
-        document,
-        rpcSerializer::decodeValue);
+        new ProtobufValue(document.getFieldsMap()));
   }
 
   /** Encodes a NoDocument value to the equivalent proto. */

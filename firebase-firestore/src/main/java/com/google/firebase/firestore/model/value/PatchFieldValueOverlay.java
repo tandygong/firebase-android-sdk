@@ -16,19 +16,24 @@ package com.google.firebase.firestore.model.value;
 
 import androidx.annotation.Nullable;
 import com.google.firebase.firestore.model.FieldPath;
-import com.google.firebase.firestore.model.mutation.FieldMask;
 import com.google.firestore.v1.ValueOrBuilder;
 
-public abstract class FieldValue {
-  public abstract @Nullable ValueOrBuilder get(FieldPath fieldPath);
+class PatchFieldValueOverlay extends FieldValue {
+  private FieldValue documentValue;
+  private FieldPath path;
+  private ValueOrBuilder value;
 
-  public FieldValue delete(FieldPath path) {
-    return new DeleteFieldValueOverlay(this, path);
+  public PatchFieldValueOverlay(FieldValue documentValue, FieldPath path, ValueOrBuilder value) {
+    this.documentValue = documentValue;
+    this.path = path;
+    this.value = value;
   }
 
-  public FieldValue set(FieldPath path, ValueOrBuilder newValue) {
-    return new PatchFieldValueOverlay(this, path, newValue);
+  @Nullable
+  @Override
+  public ValueOrBuilder get(FieldPath fieldPath) {
+    return path.isPrefixOf(fieldPath)
+        ? ProtobufValue.extractValue(value, fieldPath)
+        : documentValue.get(fieldPath);
   }
-
-  public abstract FieldMask getFieldMask();
 }

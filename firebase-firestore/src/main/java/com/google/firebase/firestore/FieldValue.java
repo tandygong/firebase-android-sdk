@@ -27,28 +27,28 @@ public abstract class FieldValue {
   FieldValue() {}
 
   /**
-   * Returns the method name (for example, "FieldValue.delete") that was used to create this {@code
-   * FieldValue} instance, for use in error messages, etc.
+   * Returns the method name (for example, "ProtobufValue.delete") that was used to create this
+   * {@code ProtobufValue} instance, for use in error messages, etc.
    */
   abstract String getMethodName();
 
-  /* {@code FieldValue} class for field deletes. */
+  /* {@code ProtobufValue} class for field deletes. */
   static class DeleteFieldValue extends FieldValue {
     @Override
     String getMethodName() {
-      return "FieldValue.delete";
+      return "ProtobufValue.delete";
     }
   }
 
-  /* {@code FieldValue} class for server timestamps. */
+  /* {@code ProtobufValue} class for server timestamps. */
   static class ServerTimestampFieldValue extends FieldValue {
     @Override
     String getMethodName() {
-      return "FieldValue.serverTimestamp";
+      return "ProtobufValue.serverTimestamp";
     }
   }
 
-  /* {@code FieldValue} class for {@link #arrayUnion()} transforms. */
+  /* {@code ProtobufValue} class for {@link #arrayUnion()} transforms. */
   static class ArrayUnionFieldValue extends FieldValue {
     private final List<Object> elements;
 
@@ -58,7 +58,7 @@ public abstract class FieldValue {
 
     @Override
     String getMethodName() {
-      return "FieldValue.arrayUnion";
+      return "ProtobufValue.arrayUnion";
     }
 
     List<Object> getElements() {
@@ -66,7 +66,7 @@ public abstract class FieldValue {
     }
   }
 
-  /* {@code FieldValue} class for {@link #arrayRemove()} transforms. */
+  /* {@code ProtobufValue} class for {@link #arrayRemove()} transforms. */
   static class ArrayRemoveFieldValue extends FieldValue {
     private final List<Object> elements;
 
@@ -76,7 +76,7 @@ public abstract class FieldValue {
 
     @Override
     String getMethodName() {
-      return "FieldValue.arrayRemove";
+      return "ProtobufValue.arrayRemove";
     }
 
     List<Object> getElements() {
@@ -84,7 +84,7 @@ public abstract class FieldValue {
     }
   }
 
-  /* {@code FieldValue} class for {@link #increment()} transforms. */
+  /* {@code ProtobufValue} class for {@link #increment()} transforms. */
   static class NumericIncrementFieldValue extends FieldValue {
     private final Number operand;
 
@@ -94,7 +94,7 @@ public abstract class FieldValue {
 
     @Override
     String getMethodName() {
-      return "FieldValue.increment";
+      return "ProtobufValue.increment";
     }
 
     Number getOperand() {
@@ -129,7 +129,8 @@ public abstract class FieldValue {
    * exactly the specified elements.
    *
    * @param elements The elements to union into the array.
-   * @return The {@code FieldValue} sentinel for use in a call to {@code set()} or {@code update()}.
+   * @return The {@code ProtobufValue} sentinel for use in a call to {@code set()} or {@code
+   *     update()}.
    */
   @NonNull
   public static FieldValue arrayUnion(Object... elements) {
@@ -143,7 +144,8 @@ public abstract class FieldValue {
    * is not already an array it will be overwritten with an empty array.
    *
    * @param elements The elements to remove from the array.
-   * @return The {@code FieldValue} sentinel for use in a call to {@code set()} or {@code update()}.
+   * @return The {@code ProtobufValue} sentinel for use in a call to {@code set()} or {@code
+   *     update()}.
    */
   @NonNull
   public static FieldValue arrayRemove(Object... elements) {
@@ -161,7 +163,8 @@ public abstract class FieldValue {
    * <p>If the current field is not an integer or double, or if the field does not yet exist, the
    * transformation will set the field to the given value.
    *
-   * @return The {@code FieldValue} sentinel for use in a call to {@code set()} or {@code update()}.
+   * @return The {@code ProtobufValue} sentinel for use in a call to {@code set()} or {@code
+   *     update()}.
    */
   @NonNull
   public static FieldValue increment(long l) {
@@ -176,7 +179,8 @@ public abstract class FieldValue {
    * interpreted as doubles and all arithmetic will follow IEEE 754 semantics. Otherwise, the
    * transformation will set the field to the given value.
    *
-   * @return The {@code FieldValue} sentinel for use in a call to {@code set()} or {@code update()}.
+   * @return The {@code ProtobufValue} sentinel for use in a call to {@code set()} or {@code
+   *     update()}.
    */
   @NonNull
   public static FieldValue increment(double l) {

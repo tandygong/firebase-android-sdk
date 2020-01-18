@@ -37,14 +37,9 @@ import com.google.firebase.firestore.core.OrderBy;
 import com.google.firebase.firestore.core.QueryListener;
 import com.google.firebase.firestore.core.ViewSnapshot;
 import com.google.firebase.firestore.model.Document;
-import com.google.firebase.firestore.model.DocumentKey;
-import com.google.firebase.firestore.model.ResourcePath;
-import com.google.firebase.firestore.model.value.ArrayValue;
-import com.google.firebase.firestore.model.value.FieldValue;
-import com.google.firebase.firestore.model.value.ReferenceValue;
-import com.google.firebase.firestore.model.value.ServerTimestampValue;
 import com.google.firebase.firestore.util.Executors;
-import com.google.firebase.firestore.util.Util;
+import com.google.firestore.v1.ArrayValue;
+import com.google.firestore.v1.Value;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -326,7 +321,7 @@ public class Query {
   private Query whereHelper(@NonNull FieldPath fieldPath, Operator op, Object value) {
     checkNotNull(fieldPath, "Provided field path must not be null.");
     checkNotNull(op, "Provided op must not be null.");
-    FieldValue fieldValue;
+    Value fieldValue;
     com.google.firebase.firestore.model.FieldPath internalPath = fieldPath.getInternalPath();
     if (internalPath.isKeyField()) {
       if (op == Operator.ARRAY_CONTAINS || op == Operator.ARRAY_CONTAINS_ANY) {
@@ -336,11 +331,14 @@ public class Query {
                 + "' queries on FieldPath.documentId().");
       } else if (op == Operator.IN) {
         validateDisjunctiveFilterElements(value, op);
-        List<FieldValue> referenceList = new ArrayList<>();
+        List<Value> referenceList = new ArrayList<>();
         for (Object arrayValue : (List) value) {
           referenceList.add(parseDocumentIdValue(arrayValue));
         }
-        fieldValue = ArrayValue.fromList(referenceList);
+        fieldValue =
+            Value.newBuilder()
+                .setArrayValue(ArrayValue.newBuilder().addAllValues(referenceList))
+                .build();
       } else {
         fieldValue = parseDocumentIdValue(value);
       }
@@ -367,42 +365,44 @@ public class Query {
    * Parses the given documentIdValue into a ReferenceValue, throwing appropriate errors if the
    * value is anything other than a DocumentReference or String, or if the string is malformed.
    */
-  private ReferenceValue parseDocumentIdValue(Object documentIdValue) {
-    if (documentIdValue instanceof String) {
-      String documentId = (String) documentIdValue;
-      if (documentId.isEmpty()) {
-        throw new IllegalArgumentException(
-            "Invalid query. When querying with FieldPath.documentId() you must provide a valid "
-                + "document ID, but it was an empty string.");
-      }
-      if (!query.isCollectionGroupQuery() && documentId.contains("/")) {
-        throw new IllegalArgumentException(
-            "Invalid query. When querying a collection by FieldPath.documentId() you must "
-                + "provide a plain document ID, but '"
-                + documentId
-                + "' contains a '/' character.");
-      }
-      ResourcePath path = query.getPath().append(ResourcePath.fromString(documentId));
-      if (!DocumentKey.isDocumentKey(path)) {
-        throw new IllegalArgumentException(
-            "Invalid query. When querying a collection group by FieldPath.documentId(), the "
-                + "value provided must result in a valid document path, but '"
-                + path
-                + "' is not because it has an odd number of segments ("
-                + path.length()
-                + ").");
-      }
-      return ReferenceValue.valueOf(
-          this.getFirestore().getDatabaseId(), DocumentKey.fromPath(path));
-    } else if (documentIdValue instanceof DocumentReference) {
-      DocumentReference ref = (DocumentReference) documentIdValue;
-      return ReferenceValue.valueOf(this.getFirestore().getDatabaseId(), ref.getKey());
-    } else {
-      throw new IllegalArgumentException(
-          "Invalid query. When querying with FieldPath.documentId() you must provide a valid "
-              + "String or DocumentReference, but it was of type: "
-              + Util.typeName(documentIdValue));
-    }
+  private Value parseDocumentIdValue(Object documentIdValue) {
+    //    if (documentIdValue instanceof String) {
+    //      String documentId = (String) documentIdValue;
+    //      if (documentId.isEmpty()) {
+    //        throw new IllegalArgumentException(
+    //            "Invalid query. When querying with FieldPath.documentId() you must provide a valid
+    // "
+    //                + "document ID, but it was an empty string.");
+    //      }
+    //      if (!query.isCollectionGroupQuery() && documentId.contains("/")) {
+    //        throw new IllegalArgumentException(
+    //            "Invalid query. When querying a collection by FieldPath.documentId() you must "
+    //                + "provide a plain document ID, but '"
+    //                + documentId
+    //                + "' contains a '/' character.");
+    //      }
+    //      ResourcePath path = query.getPath().append(ResourcePath.fromString(documentId));
+    //      if (!DocumentKey.isDocumentKey(path)) {
+    //        throw new IllegalArgumentException(
+    //            "Invalid query. When querying a collection group by FieldPath.documentId(), the "
+    //                + "value provided must result in a valid document path, but '"
+    //                + path
+    //                + "' is not because it has an odd number of segments ("
+    //                + path.length()
+    //                + ").");
+    //      }
+    //      return ReferenceValue.valueOf(
+    //          this.getFirestore().getDatabaseId(), DocumentKey.fromPath(path));
+    //    } else if (documentIdValue instanceof DocumentReference) {
+    //      DocumentReference ref = (DocumentReference) documentIdValue;
+    //      return ReferenceValue.valueOf(this.getFirestore().getDatabaseId(), ref.getKey());
+    //    } else {
+    //      throw new IllegalArgumentException(
+    //          "Invalid query. When querying with FieldPath.documentId() you must provide a valid "
+    //              + "String or DocumentReference, but it was of type: "
+    //              + Util.typeName(documentIdValue));
+    //    }
+    return null;
   }
 
   /** Validates that the value passed into a disjunctive filter satisfies all array requirements. */
@@ -740,91 +740,94 @@ public class Query {
               + "().");
     }
     Document document = snapshot.getDocument();
-    List<FieldValue> components = new ArrayList<>();
+    List<Value> components = new ArrayList<>();
 
     // Because people expect to continue/end a query at the exact document provided, we need to
     // use the implicit sort order rather than the explicit sort order, because it's guaranteed to
     // contain the document key. That way the position becomes unambiguous and the query
     // continues/ends exactly at the provided document. Without the key (by using the explicit sort
     // orders), multiple documents could match the position, yielding duplicate results.
-    for (OrderBy orderBy : query.getOrderBy()) {
-      if (orderBy.getField().equals(com.google.firebase.firestore.model.FieldPath.KEY_PATH)) {
-        components.add(ReferenceValue.valueOf(firestore.getDatabaseId(), document.getKey()));
-      } else {
-        FieldValue value = document.getField(orderBy.getField());
-        if (value instanceof ServerTimestampValue) {
-          throw new IllegalArgumentException(
-              "Invalid query. You are trying to start or end a query using a document for which "
-                  + "the field '"
-                  + orderBy.getField()
-                  + "' is an uncommitted server timestamp. (Since the value of this field is "
-                  + "unknown, you cannot start/end a query with it.)");
-        } else if (value != null) {
-          components.add(value);
-        } else {
-          throw new IllegalArgumentException(
-              "Invalid query. You are trying to start or end a query using a document for which "
-                  + "the field '"
-                  + orderBy.getField()
-                  + "' (used as the orderBy) does not exist.");
-        }
-      }
-    }
+    //    for (OrderBy orderBy : query.getOrderBy()) {
+    //      if (orderBy.getField().equals(com.google.firebase.firestore.model.FieldPath.KEY_PATH)) {
+    //        components.add(ReferenceValue.valueOf(firestore.getDatabaseId(), document.getKey()));
+    //      } else {
+    //        ProtobufValue value = document.getField(orderBy.getField());
+    //        if (value instanceof ServerTimestampValue) {
+    //          throw new IllegalArgumentException(
+    //              "Invalid query. You are trying to start or end a query using a document for
+    // which "
+    //                  + "the field '"
+    //                  + orderBy.getField()
+    //                  + "' is an uncommitted server timestamp. (Since the value of this field is "
+    //                  + "unknown, you cannot start/end a query with it.)");
+    //        } else if (value != null) {
+    //          components.add(value);
+    //        } else {
+    //          throw new IllegalArgumentException(
+    //              "Invalid query. You are trying to start or end a query using a document for
+    // which "
+    //                  + "the field '"
+    //                  + orderBy.getField()
+    //                  + "' (used as the orderBy) does not exist.");
+    //        }
+    //      }
+    //    }
     return new Bound(components, before);
   }
 
   /** Converts a list of field values to Bound. */
   private Bound boundFromFields(String methodName, Object[] values, boolean before) {
-    // Use explicit order by's because it has to match the query the user made
-    List<OrderBy> explicitOrderBy = query.getExplicitOrderBy();
-    if (values.length > explicitOrderBy.size()) {
-      throw new IllegalArgumentException(
-          "Too many arguments provided to "
-              + methodName
-              + "(). The number of arguments must be less "
-              + "than or equal to the number of orderBy() clauses.");
-    }
-
-    List<FieldValue> components = new ArrayList<>();
-    for (int i = 0; i < values.length; i++) {
-      Object rawValue = values[i];
-      OrderBy orderBy = explicitOrderBy.get(i);
-      if (orderBy.getField().equals(com.google.firebase.firestore.model.FieldPath.KEY_PATH)) {
-        if (!(rawValue instanceof String)) {
-          throw new IllegalArgumentException(
-              "Invalid query. Expected a string for document ID in "
-                  + methodName
-                  + "(), but got "
-                  + rawValue
-                  + ".");
-        }
-        String documentId = (String) rawValue;
-        if (!query.isCollectionGroupQuery() && documentId.contains("/")) {
-          throw new IllegalArgumentException(
-              "Invalid query. When querying a collection and ordering by FieldPath.documentId(), "
-                  + "the value passed to "
-                  + methodName
-                  + "() must be a plain document ID, but '"
-                  + documentId
-                  + "' contains a slash.");
-        }
-        ResourcePath path = query.getPath().append(ResourcePath.fromString(documentId));
-        if (!DocumentKey.isDocumentKey(path)) {
-          throw new IllegalArgumentException(
-              "Invalid query. When querying a collection group and ordering by "
-                  + "FieldPath.documentId(), the value passed to "
-                  + methodName
-                  + "() must result in a valid document path, but '"
-                  + path
-                  + "' is not because it contains an odd number of segments.");
-        }
-        DocumentKey key = DocumentKey.fromPath(path);
-        components.add(ReferenceValue.valueOf(firestore.getDatabaseId(), key));
-      } else {
-        FieldValue wrapped = firestore.getDataConverter().parseQueryValue(rawValue);
-        components.add(wrapped);
-      }
-    }
+    //    // Use explicit order by's because it has to match the query the user made
+    //    List<OrderBy> explicitOrderBy = query.getExplicitOrderBy();
+    //    if (values.length > explicitOrderBy.size()) {
+    //      throw new IllegalArgumentException(
+    //          "Too many arguments provided to "
+    //              + methodName
+    //              + "(). The number of arguments must be less "
+    //              + "than or equal to the number of orderBy() clauses.");
+    //    }
+    //
+    List<Value> components = new ArrayList<>();
+    //    for (int i = 0; i < values.length; i++) {
+    //      Object rawValue = values[i];
+    //      OrderBy orderBy = explicitOrderBy.get(i);
+    //      if (orderBy.getField().equals(com.google.firebase.firestore.model.FieldPath.KEY_PATH)) {
+    //        if (!(rawValue instanceof String)) {
+    //          throw new IllegalArgumentException(
+    //              "Invalid query. Expected a string for document ID in "
+    //                  + methodName
+    //                  + "(), but got "
+    //                  + rawValue
+    //                  + ".");
+    //        }
+    //        String documentId = (String) rawValue;
+    //        if (!query.isCollectionGroupQuery() && documentId.contains("/")) {
+    //          throw new IllegalArgumentException(
+    //              "Invalid query. When querying a collection and ordering by
+    // FieldPath.documentId(), "
+    //                  + "the value passed to "
+    //                  + methodName
+    //                  + "() must be a plain document ID, but '"
+    //                  + documentId
+    //                  + "' contains a slash.");
+    //        }
+    //        ResourcePath path = query.getPath().append(ResourcePath.fromString(documentId));
+    //        if (!DocumentKey.isDocumentKey(path)) {
+    //          throw new IllegalArgumentException(
+    //              "Invalid query. When querying a collection group and ordering by "
+    //                  + "FieldPath.documentId(), the value passed to "
+    //                  + methodName
+    //                  + "() must result in a valid document path, but '"
+    //                  + path
+    //                  + "' is not because it contains an odd number of segments.");
+    //        }
+    //        DocumentKey key = DocumentKey.fromPath(path);
+    //        components.add(ReferenceValue.valueOf(firestore.getDatabaseId(), key));
+    //      } else {
+    //        ProtobufValue wrapped = firestore.getDataConverter().parseQueryValue(rawValue);
+    //        components.add(wrapped);
+    //      }
+    //    }
 
     return new Bound(components, before);
   }

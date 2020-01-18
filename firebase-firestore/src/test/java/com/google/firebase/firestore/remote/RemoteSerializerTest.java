@@ -49,8 +49,8 @@ import com.google.firebase.firestore.model.DocumentKey;
 import com.google.firebase.firestore.model.ResourcePath;
 import com.google.firebase.firestore.model.SnapshotVersion;
 import com.google.firebase.firestore.model.mutation.Mutation;
-import com.google.firebase.firestore.model.value.FieldValue;
 import com.google.firebase.firestore.model.value.NullValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import com.google.firebase.firestore.model.value.ReferenceValue;
 import com.google.firebase.firestore.remote.WatchChange.WatchTargetChange;
 import com.google.firebase.firestore.remote.WatchChange.WatchTargetChangeType;
@@ -117,7 +117,7 @@ public final class RemoteSerializerTest {
   }
 
   private void assertRoundTrip(
-      FieldValue value, com.google.firestore.v1.Value proto, ValueTypeCase typeCase) {
+      ProtobufValue value, com.google.firestore.v1.Value proto, ValueTypeCase typeCase) {
     com.google.firestore.v1.Value actual = serializer.encodeValue(value);
     assertEquals(typeCase, actual.getValueTypeCase());
     assertEquals(proto, actual);
@@ -126,7 +126,7 @@ public final class RemoteSerializerTest {
 
   @Test
   public void testEncodesNull() {
-    FieldValue value = NullValue.nullValue();
+    ProtobufValue value = NullValue.nullValue();
     com.google.firestore.v1.Value proto = valueBuilder().setNullValueValue(0).build();
     assertRoundTrip(value, proto, ValueTypeCase.NULL_VALUE);
   }
@@ -135,7 +135,7 @@ public final class RemoteSerializerTest {
   public void testEncodesBoolean() {
     List<Boolean> tests = asList(true, false);
     for (Boolean test : tests) {
-      FieldValue value = wrap(test);
+      ProtobufValue value = wrap(test);
       com.google.firestore.v1.Value proto = valueBuilder().setBooleanValue(test).build();
       assertRoundTrip(value, proto, ValueTypeCase.BOOLEAN_VALUE);
     }
@@ -145,7 +145,7 @@ public final class RemoteSerializerTest {
   public void testEncodesIntegers() {
     List<Long> tests = asList(Long.MIN_VALUE, -100L, -1L, 0L, 1L, 100L, Long.MAX_VALUE);
     for (Long test : tests) {
-      FieldValue value = wrap(test);
+      ProtobufValue value = wrap(test);
       com.google.firestore.v1.Value proto = valueBuilder().setIntegerValue(test).build();
       assertRoundTrip(value, proto, ValueTypeCase.INTEGER_VALUE);
     }
@@ -173,7 +173,7 @@ public final class RemoteSerializerTest {
             Double.MAX_VALUE,
             Double.POSITIVE_INFINITY);
     for (Double test : tests) {
-      FieldValue value = wrap(test);
+      ProtobufValue value = wrap(test);
       com.google.firestore.v1.Value proto = valueBuilder().setDoubleValue(test).build();
       assertRoundTrip(value, proto, ValueTypeCase.DOUBLE_VALUE);
     }
@@ -183,7 +183,7 @@ public final class RemoteSerializerTest {
   public void testEncodesStrings() {
     List<String> tests = asList("", "a", "abc def", "æ", "\0\ud7ff\ue000\uffff", "(╯°□°）╯︵ ┻━┻");
     for (String test : tests) {
-      FieldValue value = wrap(test);
+      ProtobufValue value = wrap(test);
       com.google.firestore.v1.Value proto = valueBuilder().setStringValue(test).build();
       assertRoundTrip(value, proto, ValueTypeCase.STRING_VALUE);
     }
@@ -210,14 +210,14 @@ public final class RemoteSerializerTest {
             valueBuilder().setTimestampValue(ts2).build());
 
     for (int i = 0; i < tests.size(); i++) {
-      FieldValue value = wrap(tests.get(i));
+      ProtobufValue value = wrap(tests.get(i));
       assertRoundTrip(value, expected.get(i), ValueTypeCase.TIMESTAMP_VALUE);
     }
   }
 
   @Test
   public void testEncodesGeoPoints() {
-    FieldValue geoPoint = wrap(new GeoPoint(1.23, 4.56));
+    ProtobufValue geoPoint = wrap(new GeoPoint(1.23, 4.56));
     com.google.firestore.v1.Value.Builder proto = valueBuilder();
     proto.setGeoPointValue(LatLng.newBuilder().setLatitude(1.23).setLongitude(4.56));
 
@@ -226,7 +226,7 @@ public final class RemoteSerializerTest {
 
   @Test
   public void testEncodesBlobs() {
-    FieldValue blob = wrap(TestUtil.blob(0, 1, 2, 3));
+    ProtobufValue blob = wrap(TestUtil.blob(0, 1, 2, 3));
     com.google.firestore.v1.Value.Builder proto = valueBuilder();
     proto.setBytesValue(TestUtil.byteString(0, 1, 2, 3));
 
@@ -236,7 +236,7 @@ public final class RemoteSerializerTest {
   @Test
   public void testEncodesReferences() {
     DocumentReference value = ref("foo/bar");
-    FieldValue ref = wrap(value);
+    ProtobufValue ref = wrap(value);
     com.google.firestore.v1.Value.Builder proto = valueBuilder();
     proto.setReferenceValue("projects/project/databases/(default)/documents/foo/bar");
 
@@ -245,7 +245,7 @@ public final class RemoteSerializerTest {
 
   @Test
   public void testEncodeArrays() {
-    FieldValue model = wrap(asList(true, "foo"));
+    ProtobufValue model = wrap(asList(true, "foo"));
     ArrayValue.Builder builder = ArrayValue.newBuilder();
     builder
         .addValues(valueBuilder().setBooleanValue(true))
@@ -258,7 +258,7 @@ public final class RemoteSerializerTest {
 
   @Test
   public void testEncodesNestedObjects() {
-    FieldValue model =
+    ProtobufValue model =
         TestUtil.wrapObject(
             map(
                 "b",

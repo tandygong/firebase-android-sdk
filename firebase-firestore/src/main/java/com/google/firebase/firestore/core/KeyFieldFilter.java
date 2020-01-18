@@ -16,18 +16,18 @@ package com.google.firebase.firestore.core;
 
 import com.google.firebase.firestore.model.Document;
 import com.google.firebase.firestore.model.FieldPath;
-import com.google.firebase.firestore.model.value.ReferenceValue;
+import com.google.firestore.v1.Value;
 
 /** Filter that matches on key fields (i.e. '__name__'). */
 public class KeyFieldFilter extends FieldFilter {
-  KeyFieldFilter(FieldPath field, Operator operator, ReferenceValue value) {
+  KeyFieldFilter(FieldPath field, Operator operator, Value value) {
     super(field, operator, value);
   }
 
   @Override
   public boolean matches(Document doc) {
-    ReferenceValue referenceValue = (ReferenceValue) getValue();
-    int comparator = doc.getKey().compareTo(referenceValue.value());
+    int comparator =
+        doc.getKey().getPath().canonicalString().compareTo(getValue().getReferenceValue());
     return this.matchesComparison(comparator);
   }
 }

@@ -22,15 +22,16 @@ import com.google.firebase.firestore.model.Document;
 import com.google.firebase.firestore.model.DocumentKey;
 import com.google.firebase.firestore.model.MaybeDocument;
 import com.google.firebase.firestore.model.SnapshotVersion;
-import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.FieldValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 
 /**
  * A mutation that creates or replaces the document at the given key with the object value contents.
  */
 public final class SetMutation extends Mutation {
-  private final ObjectValue value;
+  private final FieldValue value;
 
-  public SetMutation(DocumentKey key, ObjectValue value, Precondition precondition) {
+  public SetMutation(DocumentKey key, FieldValue value, Precondition precondition) {
     super(key, precondition);
     this.value = value;
   }
@@ -90,13 +91,13 @@ public final class SetMutation extends Mutation {
   }
 
   /** Returns the object value to use when setting the document. */
-  public ObjectValue getValue() {
+  public FieldValue getValue() {
     return value;
   }
 
   @Nullable
   @Override
-  public ObjectValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
+  public ProtobufValue extractBaseValue(@Nullable MaybeDocument maybeDoc) {
     return null;
   }
 }

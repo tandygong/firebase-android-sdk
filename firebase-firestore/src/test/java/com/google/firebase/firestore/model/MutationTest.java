@@ -44,6 +44,7 @@ import com.google.firebase.firestore.model.mutation.Precondition;
 import com.google.firebase.firestore.model.mutation.TransformMutation;
 import com.google.firebase.firestore.model.value.IntegerValue;
 import com.google.firebase.firestore.model.value.ObjectValue;
+import com.google.firebase.firestore.model.value.ProtobufValue;
 import com.google.firebase.firestore.model.value.ServerTimestampValue;
 import com.google.firebase.firestore.model.value.StringValue;
 import com.google.firebase.firestore.model.value.TimestampValue;
@@ -677,7 +678,7 @@ public class MutationTest {
     Mutation transformMutation = transformMutation("collection/key", allTransforms);
     ObjectValue baseValue = transformMutation.extractBaseValue(baseDoc);
 
-    com.google.firebase.firestore.model.value.FieldValue expected =
+    ProtobufValue expected =
         wrap(
             map(
                 "double",
