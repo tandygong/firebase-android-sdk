@@ -18,6 +18,7 @@ import static com.google.firebase.firestore.remote.RemoteSerializer.extractLocal
 import static com.google.firebase.firestore.util.Assert.fail;
 import static com.google.firebase.firestore.util.Assert.hardAssert;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.Blob;
@@ -27,8 +28,10 @@ import com.google.firebase.firestore.remote.RemoteSerializer;
 import com.google.firebase.firestore.util.SortedMapValueIterator;
 import com.google.firebase.firestore.util.Util;
 import com.google.firestore.v1.ArrayValue;
+import com.google.firestore.v1.MapValue;
 import com.google.firestore.v1.Value;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +40,7 @@ import java.util.TreeSet;
 public class PrimitiveValue extends FieldValue {
   protected final Value internalValue;
 
-  public PrimitiveValue(Value value) {
+  public PrimitiveValue(@NonNull Value value) {
     this.internalValue = value;
   }
 
@@ -76,7 +79,7 @@ public class PrimitiveValue extends FieldValue {
       case ARRAY_VALUE:
         return convertArray(value.getArrayValue());
       case MAP_VALUE:
-        throw fail("A PrimitiveValue should never be a map");
+        return convertMap(value.getMapValue());
       case VALUETYPE_NOT_SET:
         break;
     }
@@ -87,6 +90,14 @@ public class PrimitiveValue extends FieldValue {
   private Object convertReference(String value) {
     ResourcePath resourceName = RemoteSerializer.decodeResourceName(value);
     return DocumentKey.fromPath(extractLocalPathFromResourceName(resourceName));
+  }
+
+  private Map<String, Object> convertMap(MapValue mapValue) {
+    Map<String, Object> result = new HashMap<>();
+    for (Map.Entry<String, Value> entry : mapValue.getFieldsMap().entrySet()) {
+      result.put(entry.getKey(), convertValue(entry.getValue()));
+    }
+    return result;
   }
 
   private List<Object> convertArray(ArrayValue arrayValue) {
@@ -114,7 +125,7 @@ public class PrimitiveValue extends FieldValue {
               new SortedMapValueIterator(((PrimitiveValue) o).internalValue);
           while (iterator1.hasNext() && iterator2.hasNext()) {
             Map.Entry<String, Value> entry1 = iterator1.next();
-            Map.Entry<String, Value> entry2 = iterator1.next();
+            Map.Entry<String, Value> entry2 = iterator2.next();
 
             // Optimize for non-array and non-object
             if (!entry1.getKey().equals(entry2.getKey())
@@ -322,7 +333,8 @@ public class PrimitiveValue extends FieldValue {
     }
   }
 
-  public int compareTo(FieldValue other) {
+  @Override
+  public int compareTo(@NonNull FieldValue other) {
     if (other instanceof PrimitiveValue) {
       return compareValues(this.internalValue, ((PrimitiveValue) other).internalValue);
     } else {

@@ -156,7 +156,7 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
     }
   }
 
-  public @javax.annotation.Nullable FieldValue get(FieldPath path) {
+  public @javax.annotation.Nullable FieldValue get(@NonNull FieldPath path) {
     if (path.isEmpty()) {
       return this;
     }
@@ -181,7 +181,7 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
           ++i) {
         value = this.internalValue.getMapValue().getFieldsMap().get(path.getSegment(i));
       }
-      return value != null ? createMapEntry("foo", value).getValue() : null;
+      return value != null ? new PrimitiveValue(value) : null;
     }
   }
 

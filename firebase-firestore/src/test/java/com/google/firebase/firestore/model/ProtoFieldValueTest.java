@@ -55,7 +55,8 @@ public class ProtoFieldValueTest {
                 "foo",
                 mapValue(
                     "a", integerValue(1), "b", booleanValue(true), "c", stringValue("string"))));
-    assertTrue(obj.get(field("foo")) instanceof ObjectValue);
+    assertEquals(wrapPrimitive(mapValue(
+            "a", integerValue(1), "b", booleanValue(true), "c", stringValue("string"))), obj.get(field("foo")));
     assertEquals(wrapPrimitive(1), obj.get(field("foo.a")));
     assertEquals(wrapPrimitive(true), obj.get(field("foo.b")));
     assertEquals(wrapPrimitive("string"), obj.get(field("foo.c")));
@@ -75,15 +76,18 @@ public class ProtoFieldValueTest {
     if (o instanceof Boolean) {
       return new PrimitiveValue(booleanValue((Boolean) o));
     }
+    if (o instanceof Value) {
+      return new PrimitiveValue((Value) o);
+    }
     return null;
   }
 
-  private MapValue mapValue(Object... entries) {
+  private Value mapValue(Object... entries) {
     MapValue.Builder builder = MapValue.newBuilder();
     for (int i = 0; i < entries.length; i += 2) {
       builder.putFields((String) entries[i], (Value) entries[i + 1]);
     }
-    return builder.build();
+    return Value.newBuilder().setMapValue(builder).build();
   }
 
   private Value booleanValue(boolean b) {
