@@ -24,14 +24,18 @@ import com.google.firebase.firestore.Blob;
 import com.google.firebase.firestore.model.DocumentKey;
 import com.google.firebase.firestore.model.ResourcePath;
 import com.google.firebase.firestore.remote.RemoteSerializer;
+import com.google.firebase.firestore.util.SortedMapValueIterator;
 import com.google.firebase.firestore.util.Util;
 import com.google.firestore.v1.ArrayValue;
 import com.google.firestore.v1.Value;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 
 public class PrimitiveValue extends FieldValue {
-  private final Value internalValue;
+  protected final Value internalValue;
 
   public PrimitiveValue(Value value) {
     this.internalValue = value;
@@ -95,12 +99,93 @@ public class PrimitiveValue extends FieldValue {
 
   @Override
   public boolean equals(Object o) {
-    return o instanceof PrimitiveValue && internalValue.equals(((PrimitiveValue) o).internalValue);
+    if (o instanceof ObjectValue) {
+      return o.equals(this);
+    } else if (o instanceof PrimitiveValue) {
+      if (this.typeOrder() != ((PrimitiveValue) o).typeOrder()) {
+        return false;
+      }
+
+      switch (this.typeOrder()) {
+        case TYPE_ORDER_OBJECT:
+          Iterator<Map.Entry<String, Value>> iterator1 =
+              new SortedMapValueIterator(this.internalValue);
+          Iterator<Map.Entry<String, Value>> iterator2 =
+              new SortedMapValueIterator(((PrimitiveValue) o).internalValue);
+          while (iterator1.hasNext() && iterator2.hasNext()) {
+            Map.Entry<String, Value> entry1 = iterator1.next();
+            Map.Entry<String, Value> entry2 = iterator1.next();
+
+            // Optimize for non-array and non-object
+            if (!entry1.getKey().equals(entry2.getKey())
+                || !new PrimitiveValue(entry1.getValue())
+                    .equals(new PrimitiveValue(entry2.getValue()))) {
+              return false;
+            }
+          }
+
+          return true;
+
+        case TYPE_ORDER_ARRAY:
+          if (this.internalValue.getArrayValue().getValuesCount()
+              != ((PrimitiveValue) o).internalValue.getArrayValue().getValuesCount()) {
+            return false;
+          }
+
+          for (int i = 0; i < this.internalValue.getArrayValue().getValuesCount(); ++i) {
+            if (!new PrimitiveValue(this.internalValue.getArrayValue().getValues(i))
+                .equals(
+                    new PrimitiveValue(
+                        ((PrimitiveValue) o).internalValue.getArrayValue().getValues(i)))) {
+              return false;
+            }
+          }
+
+          return true;
+        case TYPE_ORDER_NUMBER:
+          if (this.internalValue.getValueTypeCase() == Value.ValueTypeCase.INTEGER_VALUE
+              && ((PrimitiveValue) o).internalValue.getValueTypeCase()
+                  == Value.ValueTypeCase.INTEGER_VALUE) {
+            return this.internalValue.equals(((PrimitiveValue) o).internalValue);
+          } else if (this.internalValue.getValueTypeCase() == Value.ValueTypeCase.DOUBLE_VALUE
+              && ((PrimitiveValue) o).internalValue.getValueTypeCase()
+                  == Value.ValueTypeCase.DOUBLE_VALUE) {
+            return Double.doubleToLongBits(this.internalValue.getDoubleValue())
+                == Double.doubleToLongBits(((PrimitiveValue) o).internalValue.getDoubleValue());
+
+          } else {
+            return false;
+          }
+        default:
+          return this.internalValue.equals(((PrimitiveValue) o).internalValue);
+      }
+    }
+    return false;
   }
 
   @Override
   public int hashCode() {
-    return internalValue.hashCode();
+    if (isMap(internalValue)) {
+      int hashCode = 0;
+      for (String key : new TreeSet<>(this.internalValue.getMapValue().getFieldsMap().keySet())) {
+        hashCode = hashCode * 31 + key.hashCode();
+        // Optimize for non-array and non-object
+        hashCode =
+            hashCode * 31
+                + new PrimitiveValue(this.internalValue.getMapValue().getFieldsMap().get(key))
+                    .hashCode();
+      }
+      return hashCode;
+    } else if (isArray(internalValue)) {
+      int hashCode = 0;
+      for (Value value : this.internalValue.getArrayValue().getValuesList()) {
+        // Optimize for non-array and non-object
+        hashCode = hashCode * 31 + new PrimitiveValue(value).hashCode();
+      }
+      return hashCode;
+    } else {
+      return internalValue.hashCode();
+    }
   }
 
   static int extractTypeOrder(Value value) {
@@ -210,7 +295,28 @@ public class PrimitiveValue extends FieldValue {
         return Util.compareIntegers(
             left.getArrayValue().getValuesCount(), right.getArrayValue().getValuesCount());
       case TYPE_ORDER_OBJECT:
-        throw fail("A PrimitiveValue should never be a map");
+        Iterator<String> iterator1 =
+            new TreeSet<>(left.getMapValue().getFieldsMap().keySet()).iterator();
+        Iterator<String> iterator2 =
+            new TreeSet<>(left.getMapValue().getFieldsMap().keySet()).iterator();
+        while (iterator1.hasNext() && iterator2.hasNext()) {
+          String key1 = iterator1.next();
+          String key2 = iterator2.next();
+          int keyCompare = key1.compareTo(key2);
+          if (keyCompare != 0) {
+            return keyCompare;
+          }
+          int valueCompare =
+              compareValues(
+                  left.getMapValue().getFieldsMap().get(key1),
+                  right.getMapValue().getFieldsMap().get(key2));
+          if (valueCompare != 0) {
+            return valueCompare;
+          }
+        }
+
+        // Only equal if both iterators are exhausted.
+        return Util.compareBooleans(iterator1.hasNext(), iterator2.hasNext());
       default:
         throw fail("Unexpected value");
     }
@@ -222,5 +328,13 @@ public class PrimitiveValue extends FieldValue {
     } else {
       return Util.compareIntegers(typeOrder(), other.typeOrder());
     }
+  }
+
+  protected static boolean isMap(@Nullable Value value) {
+    return value != null && value.getValueTypeCase() == Value.ValueTypeCase.MAP_VALUE;
+  }
+
+  protected static boolean isArray(@Nullable Value value) {
+    return value != null && value.getValueTypeCase() == Value.ValueTypeCase.ARRAY_VALUE;
   }
 }

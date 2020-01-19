@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.google.firebase.database.collection.ImmutableSortedMap;
 import com.google.firebase.firestore.model.FieldPath;
+import com.google.firebase.firestore.util.SortedMapValueIterator;
 import com.google.firebase.firestore.util.Util;
 import com.google.firestore.v1.MapValue;
 import com.google.firestore.v1.Value;
@@ -28,21 +29,21 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String, FieldValue>> {
-  private final MapValue internalValue;
+public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<String, FieldValue>> {
   private final ImmutableSortedMap<String, FieldValue> overlays;
 
-  public ObjectValue(MapValue backingValue, ImmutableSortedMap<String, FieldValue> overlays) {
-    this.internalValue = backingValue;
+  public ObjectValue(Value internalValue, ImmutableSortedMap<String, FieldValue> overlays) {
+    super(internalValue);
+    hardAssert(isMap(internalValue), "...");
     this.overlays = overlays;
   }
 
   public ObjectValue() {
-    this(MapValue.newBuilder().build());
+    this(Value.newBuilder().setMapValue(MapValue.getDefaultInstance()).build());
   }
 
-  public ObjectValue(MapValue backingValue) {
-    this(backingValue, ImmutableSortedMap.Builder.emptyMap(String::compareTo));
+  public ObjectValue(Value internalValue) {
+    this(internalValue, ImmutableSortedMap.Builder.emptyMap(String::compareTo));
   }
 
   @Override
@@ -72,8 +73,20 @@ public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String
           return false;
         }
       }
+    } else if (o instanceof PrimitiveValue && isMap(((PrimitiveValue) o).internalValue)) {
+      Iterator<Map.Entry<String, FieldValue>> iterator1 = this.iterator();
+      Iterator<Map.Entry<String, Value>> iterator2 =
+          new SortedMapValueIterator(((PrimitiveValue) o).internalValue);
+      while (iterator1.hasNext() && iterator2.hasNext()) {
+        Map.Entry<String, FieldValue> entry1 = iterator1.next();
+        Map.Entry<String, Value> entry2 = iterator2.next();
+        if (entry1.getKey().equals(entry1.getKey())
+            && entry1.getValue().equals(new PrimitiveValue(entry2.getValue()))) {
+          return false;
+        }
+      }
     }
-    return false;
+    return super.equals(o);
   }
 
   @Override
@@ -117,7 +130,7 @@ public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String
     if (path.length() == 1) {
       return setChild(childName, value);
     } else {
-      FieldValue child = get(childName);
+      FieldValue child = get(FieldPath.fromSingleSegment(childName));
       if (!(child instanceof ObjectValue)) {
         child = new ObjectValue();
       }
@@ -132,7 +145,7 @@ public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String
     if (path.length() == 1) {
       return new ObjectValue(internalValue, overlays.insert(childName, null));
     } else {
-      FieldValue child = get(childName);
+      FieldValue child = get(FieldPath.fromSingleSegment(childName));
       if (child instanceof ObjectValue) {
         ObjectValue newChild = ((ObjectValue) child).delete(path.popFirst());
         return setChild(childName, newChild);
@@ -143,18 +156,32 @@ public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String
     }
   }
 
-  private @javax.annotation.Nullable FieldValue get(String childName) {
+  public @javax.annotation.Nullable FieldValue get(FieldPath path) {
+    if (path.isEmpty()) {
+      return this;
+    }
+
+    String childName = path.getFirstSegment();
+
     if (overlays.containsKey(childName)) {
-      return overlays.get(childName);
-    } else {
-      Value value = this.internalValue.getFieldsMap().get(childName);
-      if (value == null) {
+      FieldValue fieldValue = overlays.get(childName);
+      if (path.length() == 1) {
+        return fieldValue;
+      } else if (fieldValue instanceof ObjectValue) {
+        return ((ObjectValue) fieldValue).get(path.popFirst());
+      } else {
         return null;
       }
-      if (value.getValueTypeCase() == Value.ValueTypeCase.MAP_VALUE) {
-        return new ObjectValue(value.getMapValue());
+    } else {
+      @Nullable Value value = this.internalValue.getMapValue().getFieldsMap().get(childName);
+      for (int i = 1;
+          value != null
+              && value.getValueTypeCase() == Value.ValueTypeCase.MAP_VALUE
+              && i < path.length();
+          ++i) {
+        value = this.internalValue.getMapValue().getFieldsMap().get(path.getSegment(i));
       }
-      return new PrimitiveValue(value);
+      return value != null ? createMapEntry("foo", value).getValue() : null;
     }
   }
 
@@ -166,10 +193,9 @@ public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String
   @Override
   public Iterator<Map.Entry<String, FieldValue>> iterator() {
     return new Iterator<Map.Entry<String, FieldValue>>() {
-      Iterator<Map.Entry<String, Value>> valueIterator =
-          internalValue.getFieldsMap().entrySet().iterator();
-      Map.Entry<String, Value> valuePeek = null;
-      Iterator<Map.Entry<String, FieldValue>> overlayIterator = overlays.iterator();
+      Iterator<Map.Entry<String, Value>> valueIterator = new SortedMapValueIterator(internalValue);
+      @Nullable Map.Entry<String, Value> valuePeek = null;
+      @Nullable Iterator<Map.Entry<String, FieldValue>> overlayIterator = overlays.iterator();
       Map.Entry<String, FieldValue> overlayPeek = null;
 
       private void peek() {
@@ -181,7 +207,7 @@ public class ObjectValue extends FieldValue implements Iterable<Map.Entry<String
           overlayPeek = overlayIterator.next();
         }
 
-        if (overlayPeek != null && overlayPeek.getValue() == null) {
+        if (valuePeek != null && overlayPeek != null && overlayPeek.getValue() == null) {
           if (valuePeek.getKey().equals(overlayPeek.getKey())) {
             valuePeek = null;
           }
