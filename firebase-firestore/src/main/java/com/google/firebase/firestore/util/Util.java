@@ -222,4 +222,20 @@ public class Util {
               throw exception;
             });
   }
+
+  public static int compareByteString(ByteString left, ByteString right) {
+    int size = Math.min(left.size(), right.size());
+    for (int i = 0; i < size; i++) {
+      // Make sure the bytes are unsigned
+      int thisByte = left.byteAt(i) & 0xff;
+      int otherByte = right.byteAt(i) & 0xff;
+      if (thisByte < otherByte) {
+        return -1;
+      } else if (thisByte > otherByte) {
+        return 1;
+      }
+      // Byte values are equal, continue with comparison
+    }
+    return Util.compareIntegers(left.size(), right.size());
+  }
 }

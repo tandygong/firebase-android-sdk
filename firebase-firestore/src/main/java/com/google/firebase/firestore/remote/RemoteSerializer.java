@@ -203,7 +203,7 @@ public final class RemoteSerializer {
    * project and database encoded in the path. There are no guarantees that a local path is also
    * encoded in this resource name.
    */
-  private ResourcePath decodeResourceName(String encoded) {
+  public static ResourcePath decodeResourceName(String encoded) {
     ResourcePath resource = ResourcePath.fromString(encoded);
     Assert.hardAssert(
         isValidResourceName(resource), "Tried to deserialize invalid key %s", resource);
@@ -221,7 +221,7 @@ public final class RemoteSerializer {
    * Decodes a fully qualified resource name into a resource path and validates that there is a
    * project and database encoded in the path along with a local path.
    */
-  private static ResourcePath extractLocalPathFromResourceName(ResourcePath resourceName) {
+  public static ResourcePath extractLocalPathFromResourceName(ResourcePath resourceName) {
     Assert.hardAssert(
         resourceName.length() > 4 && resourceName.getSegment(4).equals("documents"),
         "Tried to deserialize invalid key %s",
