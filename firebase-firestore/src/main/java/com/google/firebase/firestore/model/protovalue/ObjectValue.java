@@ -20,19 +20,23 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.google.firebase.database.collection.ImmutableSortedMap;
 import com.google.firebase.firestore.model.FieldPath;
+import com.google.firebase.firestore.model.mutation.FieldMask;
 import com.google.firebase.firestore.util.SortedMapValueIterator;
 import com.google.firebase.firestore.util.Util;
 import com.google.firestore.v1.MapValue;
 import com.google.firestore.v1.Value;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<String, FieldValue>> {
   private final ImmutableSortedMap<String, FieldValue> overlays;
 
-  public ObjectValue(Value internalValue, ImmutableSortedMap<String, FieldValue> overlays) {
+  public ObjectValue(
+      @NonNull Value internalValue, @NonNull ImmutableSortedMap<String, FieldValue> overlays) {
     super(internalValue);
     hardAssert(isMap(internalValue), "...");
     this.overlays = overlays;
@@ -42,8 +46,12 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
     this(Value.newBuilder().setMapValue(MapValue.getDefaultInstance()).build());
   }
 
-  public ObjectValue(Value internalValue) {
+  public ObjectValue(@NonNull Value internalValue) {
     this(internalValue, ImmutableSortedMap.Builder.emptyMap(String::compareTo));
+  }
+
+  public static @NonNull ObjectValue emptyObject() {
+    return new ObjectValue();
   }
 
   @Override
@@ -63,16 +71,21 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
 
   @Override
   public boolean equals(Object o) {
+    if (o == this) {
+      return true;
+    }
     if (o instanceof ObjectValue) {
       Iterator<Map.Entry<String, FieldValue>> iterator1 = this.iterator();
       Iterator<Map.Entry<String, FieldValue>> iterator2 = ((ObjectValue) o).iterator();
       while (iterator1.hasNext() && iterator2.hasNext()) {
         Map.Entry<String, FieldValue> entry1 = iterator1.next();
         Map.Entry<String, FieldValue> entry2 = iterator2.next();
-        if (entry1.equals(entry2)) {
+        if (!entry1.getKey().equals(entry2.getKey())
+            || !entry1.getValue().equals(entry2.getValue())) {
           return false;
         }
       }
+      return true;
     } else if (o instanceof PrimitiveValue && isMap(((PrimitiveValue) o).internalValue)) {
       Iterator<Map.Entry<String, FieldValue>> iterator1 = this.iterator();
       Iterator<Map.Entry<String, Value>> iterator2 =
@@ -85,6 +98,7 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
           return false;
         }
       }
+      return true;
     }
     return super.equals(o);
   }
@@ -124,7 +138,7 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
     return Util.compareBooleans(iterator1.hasNext(), iterator2.hasNext());
   }
 
-  public ObjectValue set(FieldPath path, FieldValue value) {
+  public @NonNull ObjectValue set(@NonNull FieldPath path, @NonNull FieldValue value) {
     hardAssert(!path.isEmpty(), "Cannot set field for empty path on ObjectValue");
     String childName = path.getFirstSegment();
     if (path.length() == 1) {
@@ -139,7 +153,7 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
     }
   }
 
-  public ObjectValue delete(FieldPath path) {
+  public @NonNull ObjectValue delete(@NonNull FieldPath path) {
     hardAssert(!path.isEmpty(), "Cannot delete field for empty path on ObjectValue");
     String childName = path.getFirstSegment();
     if (path.length() == 1) {
@@ -156,7 +170,7 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
     }
   }
 
-  public @javax.annotation.Nullable FieldValue get(@NonNull FieldPath path) {
+  public @Nullable FieldValue get(@NonNull FieldPath path) {
     if (path.isEmpty()) {
       return this;
     }
@@ -174,15 +188,53 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
       }
     } else {
       @Nullable Value value = this.internalValue.getMapValue().getFieldsMap().get(childName);
-      for (int i = 1;
-          value != null
-              && value.getValueTypeCase() == Value.ValueTypeCase.MAP_VALUE
-              && i < path.length();
-          ++i) {
-        value = this.internalValue.getMapValue().getFieldsMap().get(path.getSegment(i));
+      int i;
+      for (i = 1; isMap(value) && i < path.length(); ++i) {
+        value = value.getMapValue().getFieldsMap().get(path.getSegment(i));
       }
-      return value != null ? new PrimitiveValue(value) : null;
+      return value != null && i == path.length() ? new PrimitiveValue(value) : null;
     }
+  }
+
+  /** Recursively extracts the FieldPaths that are set in this ObjectValue. */
+  @Override
+  public @NonNull FieldMask getFieldMask() {
+    Set<FieldPath> fields = new HashSet<>();
+    for (Map.Entry<String, FieldValue> entry : this) {
+      FieldPath currentPath = FieldPath.fromSingleSegment(entry.getKey());
+      FieldValue value = entry.getValue();
+      if (value instanceof ObjectValue) {
+        FieldMask nestedMask = ((ObjectValue) value).getFieldMask();
+        Set<FieldPath> nestedFields = nestedMask.getMask();
+        if (nestedFields.isEmpty()) {
+          // Preserve the empty map by adding it to the FieldMask.
+          fields.add(currentPath);
+        } else {
+          // For nested and non-empty ObjectValues, add the FieldPath of the leaf nodes.
+          for (FieldPath nestedPath : nestedFields) {
+            fields.add(currentPath.append(nestedPath));
+          }
+        }
+      } else {
+        if (value.typeOrder() == TYPE_ORDER_OBJECT) {
+          // make  a map value instead of a getFieldMask
+          FieldMask nestedMask = ((PrimitiveValue) value).getFieldMask();
+          Set<FieldPath> nestedFields = nestedMask.getMask();
+          if (nestedFields.isEmpty()) {
+            // Preserve the empty map by adding it to the FieldMask.
+            fields.add(currentPath);
+          } else {
+            // For nested and non-empty ObjectValues, add the FieldPath of the leaf nodes.
+            for (FieldPath nestedPath : nestedFields) {
+              fields.add(currentPath.append(nestedPath));
+            }
+          }
+        } else {
+          fields.add(currentPath);
+        }
+      }
+    }
+    return FieldMask.fromSet(fields);
   }
 
   private ObjectValue setChild(String childName, FieldValue value) {
@@ -244,9 +296,13 @@ public class ObjectValue extends PrimitiveValue implements Iterable<Map.Entry<St
           }
           return result;
         } else if (valuePeek != null) {
-          return createMapEntry(valuePeek.getKey(), valuePeek.getValue());
+          Map.Entry<String, Value> result = valuePeek;
+          valuePeek = null;
+          return createMapEntry(result.getKey(), result.getValue());
         } else if (overlayPeek != null) {
-          return overlayPeek;
+          Map.Entry<String, FieldValue> result = overlayPeek;
+          overlayPeek = null;
+          return result;
         }
 
         throw new NoSuchElementException();

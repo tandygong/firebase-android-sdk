@@ -15,10 +15,12 @@
 package com.google.firebase.firestore.model;
 
 import static com.google.firebase.firestore.testutil.TestUtil.field;
+import static com.google.firebase.firestore.testutil.TestUtil.fieldMask;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
+import com.google.firebase.firestore.model.mutation.FieldMask;
 import com.google.firebase.firestore.model.protovalue.ObjectValue;
 import com.google.firebase.firestore.model.protovalue.PrimitiveValue;
 import com.google.firestore.v1.MapValue;
@@ -49,24 +51,62 @@ public class ProtoFieldValueTest {
 
   @Test
   public void testExtractsFields() {
-    ObjectValue obj =
-        new ObjectValue(
-            mapValue(
-                "foo",
-                mapValue(
-                    "a", integerValue(1), "b", booleanValue(true), "c", stringValue("string"))));
-    assertEquals(wrapPrimitive(mapValue(
-            "a", integerValue(1), "b", booleanValue(true), "c", stringValue("string"))), obj.get(field("foo")));
-    assertEquals(wrapPrimitive(1), obj.get(field("foo.a")));
-    assertEquals(wrapPrimitive(true), obj.get(field("foo.b")));
-    assertEquals(wrapPrimitive("string"), obj.get(field("foo.c")));
+    ObjectValue obj = wrapObject("foo", map("a", 1, "b", true, "c", "string"));
+    assertEquals(wrap(map("a", 1, "b", true, "c", "string")), obj.get(field("foo")));
+    assertEquals(wrap(1), obj.get(field("foo.a")));
+    assertEquals(wrap(true), obj.get(field("foo.b")));
+    assertEquals(wrap("string"), obj.get(field("foo.c")));
 
     assertNull(obj.get(field("foo.a.b")));
     assertNull(obj.get(field("bar")));
     assertNull(obj.get(field("bar.a")));
   }
 
-  private PrimitiveValue wrapPrimitive(Object o) {
+  @Test
+  public void testExtractsFieldMask() {
+    ObjectValue val =
+        wrapObject(
+            "a",
+            "b",
+            "map",
+            map("a", 1, "b", true, "c", "string", "nested", map("d", "e")),
+            "emptymap",
+            map());
+    FieldMask mask = val.getFieldMask();
+    assertEquals(fieldMask("a", "map.a", "map.b", "map.c", "map.nested.d", "emptymap"), mask);
+  }
+
+  private ObjectValue wrapObject(Object... entries) {
+    MapValue.Builder builder = MapValue.newBuilder();
+    for (int i = 0; i < entries.length; i += 2) {
+      builder.putFields((String) entries[i], wrapValue(entries[i + 1]));
+    }
+    return new ObjectValue(Value.newBuilder().setMapValue(builder).build());
+  }
+
+  @Test
+  public void testOverwritesExistingFields() {
+    ObjectValue old = wrapObject("a", "old");
+    ObjectValue mod = old.set(field("a"), wrap("mod"));
+    assertNotEquals(old, mod);
+    assertEquals(wrapObject("a", "old"), old);
+    assertEquals(wrapObject("a", "mod"), mod);
+  }
+
+  @Test
+  public void testAddsNewFields() {
+    ObjectValue empty = ObjectValue.emptyObject();
+    ObjectValue mod = empty.set(field("a"), wrap("mod"));
+    assertEquals(wrapObject(), empty);
+    assertEquals(wrapObject("a", "mod"), mod);
+
+    ObjectValue old = mod;
+    mod = old.set(field("b"), wrap(1));
+    assertEquals(wrapObject("a", "mod"), old);
+    assertEquals(wrapObject("a", "mod", "b", 1), mod);
+  }
+
+  private PrimitiveValue wrap(Object o) {
     if (o instanceof String) {
       return new PrimitiveValue(stringValue((String) o));
     }
@@ -82,10 +122,26 @@ public class ProtoFieldValueTest {
     return null;
   }
 
-  private Value mapValue(Object... entries) {
+  private Value wrapValue(Object o) {
+    if (o instanceof String) {
+      return (stringValue((String) o));
+    }
+    if (o instanceof Integer) {
+      return (integerValue((Integer) o));
+    }
+    if (o instanceof Boolean) {
+      return (booleanValue((Boolean) o));
+    }
+    if (o instanceof Value) {
+      return ((Value) o);
+    }
+    return null;
+  }
+
+  private Value map(Object... entries) {
     MapValue.Builder builder = MapValue.newBuilder();
     for (int i = 0; i < entries.length; i += 2) {
-      builder.putFields((String) entries[i], (Value) entries[i + 1]);
+      builder.putFields((String) entries[i], wrapValue(entries[i + 1]));
     }
     return Value.newBuilder().setMapValue(builder).build();
   }
@@ -102,43 +158,6 @@ public class ProtoFieldValueTest {
     return Value.newBuilder().setStringValue(s).build();
   }
 
-  //
-  //  @Test
-  //  public void testExtractsFieldMask() {
-  //    FieldValue val =
-  //        wrapObject(
-  //            "a",
-  //            "b",
-  //            "map",
-  //            map("a", 1, "b", true, "c", "string", "nested", map("d", "e")),
-  //            "emptymap",
-  //            map());
-  //    assertTrue(val instanceof ObjectValue);
-  //    FieldMask mask = ((ObjectValue) val).getFieldMask();
-  //    assertEquals(fieldMask("a", "map.a", "map.b", "map.c", "map.nested.d", "emptymap"), mask);
-  //  }
-  //
-  //  @Test
-  //  public void testOverwritesExistingFields() {
-  //    ObjectValue old = wrapObject("a", "old");
-  //    ObjectValue mod = old.set(field("a"), wrap("mod"));
-  //    assertNotEquals(old, mod);
-  //    assertEquals(wrapObject("a", "old"), old);
-  //    assertEquals(wrapObject("a", "mod"), mod);
-  //  }
-  //
-  //  @Test
-  //  public void testAddsNewFields() {
-  //    ObjectValue empty = ObjectValue.emptyObject();
-  //    ObjectValue mod = empty.set(field("a"), wrap("mod"));
-  //    assertEquals(wrap(new TreeMap<String, FieldValue>()), empty);
-  //    assertEquals(wrapObject("a", "mod"), mod);
-  //
-  //    ObjectValue old = mod;
-  //    mod = old.set(field("b"), wrap(1));
-  //    assertEquals(wrapObject("a", "mod"), old);
-  //    assertEquals(wrapObject("a", "mod", "b", 1), mod);
-  //  }
   //
   //  @Test
   //  public void testImplicitlyCreatesObjects() {

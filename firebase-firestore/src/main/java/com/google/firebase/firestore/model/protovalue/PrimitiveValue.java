@@ -23,7 +23,9 @@ import androidx.annotation.Nullable;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.Blob;
 import com.google.firebase.firestore.model.DocumentKey;
+import com.google.firebase.firestore.model.FieldPath;
 import com.google.firebase.firestore.model.ResourcePath;
+import com.google.firebase.firestore.model.mutation.FieldMask;
 import com.google.firebase.firestore.remote.RemoteSerializer;
 import com.google.firebase.firestore.util.SortedMapValueIterator;
 import com.google.firebase.firestore.util.Util;
@@ -32,9 +34,11 @@ import com.google.firestore.v1.MapValue;
 import com.google.firestore.v1.Value;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 
 public class PrimitiveValue extends FieldValue {
@@ -110,6 +114,9 @@ public class PrimitiveValue extends FieldValue {
 
   @Override
   public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
     if (o instanceof ObjectValue) {
       return o.equals(this);
     } else if (o instanceof PrimitiveValue) {
@@ -331,6 +338,33 @@ public class PrimitiveValue extends FieldValue {
       default:
         throw fail("Unexpected value");
     }
+  }
+
+  public @NonNull FieldMask getFieldMask() {
+    Set<FieldPath> fields = new HashSet<>();
+
+    if (isMap(internalValue)) {
+      for (Map.Entry<String, Value> entry : internalValue.getMapValue().getFieldsMap().entrySet()) {
+        FieldPath currentPath = FieldPath.fromSingleSegment(entry.getKey());
+        Value value = entry.getValue();
+        if (isMap(value)) {
+          FieldMask nestedMask = new PrimitiveValue(value).getFieldMask();
+          Set<FieldPath> nestedFields = nestedMask.getMask();
+          if (nestedFields.isEmpty()) {
+            // Preserve the empty map by adding it to the FieldMask.
+            fields.add(currentPath);
+          } else {
+            // For nested and non-empty ObjectValues, add the FieldPath of the leaf nodes.
+            for (FieldPath nestedPath : nestedFields) {
+              fields.add(currentPath.append(nestedPath));
+            }
+          }
+        } else {
+          fields.add(currentPath);
+        }
+      }
+    }
+    return FieldMask.fromSet(fields);
   }
 
   @Override
